@@ -1,0 +1,45 @@
+# Personal build: an unsigned IPA of this branch for SideStore.
+# Run it from the Actions tab (Run workflow). No secrets are used: Firebase
+# falls back to the project's inert placeholder, so telemetry stays off.
+name: fajr-ipa
+on:
+  workflow_dispatch:
+
+jobs:
+  ios:
+    runs-on: xcode-27
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Select the newest Xcode
+        run: |
+          x=$(ls -d /Applications/Xcode*.app | sort -V | tail -1)
+          sudo xcode-select -s "$x/Contents/Developer"
+          xcodebuild -version
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.41.6'
+      - name: Empty .env (no backend URLs)
+        run: |
+          : > .env
+          echo "ENABLE_HEALTH_DATA_CONTRIBUTION=false" >> .env
+      - run: dart pub global activate flutterfire_cli 1.4.0
+      - run: flutter pub get
+      - name: Fajr alarm tests
+        run: flutter test test/fajr_alarm_test.dart test/alarm_schedule_test.dart test/alarm_test.dart
+      - name: Build unsigned iOS app
+        run: flutter build ios --release --no-codesign --dart-define-from-file=.env
+      - name: Strip Watch companion (can't survive per-user resigning)
+        run: rm -rf build/ios/iphoneos/Runner.app/Watch
+      - name: Package unsigned IPA
+        run: |
+          cd build/ios/iphoneos
+          mkdir -p Payload
+          cp -R Runner.app Payload/Runner.app
+          zip -qr -y "$GITHUB_WORKSPACE/openstrap-edge-fajr-unsigned.ipa" Payload
+      - uses: actions/upload-artifact@v4
+        with:
+          name: openstrap-edge-fajr-ipa
+          path: openstrap-edge-fajr-unsigned.ipa
