@@ -50,6 +50,10 @@ const Map<String, String> kPrefsNotBackedUp = {
   'alarm_latch_alert': 'pending latch alert for the old band arm',
   'alarm_probe_pending': 'legacy pending hardware probe; never resume on another band',
   'alarm_fired_at': 'last fire event from the old band, not the chosen schedule',
+  'fajr_alarm_cache_v1': 'prayer times cached for this phone’s location; fetched again',
+  'fajr_alarm_fetched_at_ms': 'when this phone last fetched prayer times',
+  'fajr_alarm_coords_v1': 'the location this phone fetched prayer times for',
+  'fajr_alarm_coords_source': 'how this phone found that location',
   'smart_wake_fired_epoch': 'records that the early buzz fired for one arm on the old band; '
       'a restored latch would suppress the buzz on the next night\'s arm',
   'health_upload_last_ts': 'upload cursor for this installation',
@@ -96,6 +100,10 @@ class ImportSummary extends MapView<String, int> {
 /// backed-up key missing here is written as-is; the guard test keeps this
 /// table complete. Keys in [kPrefsNotBackedUp] need no entry.
 const Map<String, String> kPrefTypes = {
+  'fajr_alarm_buzz_count': 'int',
+  'fajr_alarm_enabled': 'bool',
+  'fajr_alarm_gap_sec': 'int',
+  'fajr_alarm_offset_min': 'int',
   'activity.nap_auto_log_since_sec': 'int',
   'ai.journal_done_day': 'string',
   'ai_evening_enabled': 'bool',
