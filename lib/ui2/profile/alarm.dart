@@ -195,10 +195,10 @@ class AlarmScreen extends StatelessWidget {
     // screen doesn't say "sent" while the band still holds the old time.
     final notOnBand = uiText(c,
         "Saved, but the band hasn't taken it yet — it's sent again on the next sync");
-    final noTimes = uiText(
-        c, "Couldn't get prayer times — check the internet connection");
-    final stockPattern = uiText(c,
-        'The band refused the custom pattern — the test (and Fajr) use its standard alarm buzz');
+    // The Fajr alarm is a personal addition: its copy is English only.
+    const noTimes = "Couldn't get prayer times — check the internet connection";
+    const stockPattern =
+        'The band refused the custom pattern — the test (and Fajr) use its standard alarm buzz';
     Future<void> onBand(Future<bool> write) async {
       if (!await write) throw Exception(notOnBand);
     }
@@ -239,6 +239,10 @@ class AlarmScreen extends StatelessWidget {
     );
   }
 }
+
+/// Fajr alarm copy: a personal addition, English only, so it stays out of
+/// the translated-literal helpers.
+String _fajrText(String s) => s;
 
 class AlarmScreenView extends StatelessWidget {
   final DateTime? armedAt;
@@ -441,15 +445,15 @@ class AlarmScreenView extends StatelessWidget {
     final prayer = fajrPrayer;
     final buzz = fajrNext;
     final when = buzz == null
-        ? uiText(c, 'Fetching prayer times…')
+        ? _fajrText('Fetching prayer times…')
         : '${_whichDay(c, buzz, now ?? DateTime.now())} · '
-            '${uiText(c, 'Fajr')} ${prayer == null ? '' : _hhmm(prayer)} → '
-            '${uiText(c, 'buzz')} ${_hhmm(buzz)}';
+            '${_fajrText('Fajr')} ${prayer == null ? '' : _hhmm(prayer)} → '
+            '${_fajrText('buzz')} ${_hhmm(buzz)}';
     final where = switch (fajrSource) {
-      'gps' => uiText(c, 'Your location'),
-      'last' => uiText(c, 'Your last location'),
-      'sharjah' => uiText(c, 'Sharjah (no location yet)'),
-      _ => uiText(c, 'Not fetched yet'),
+      'gps' => _fajrText('Your location'),
+      'last' => _fajrText('Your last location'),
+      'sharjah' => _fajrText('Sharjah (no location yet)'),
+      _ => _fajrText('Not fetched yet'),
     };
     Future<void> set({bool? on, int? off, int? n, int? gap}) async {
       if (onSetFajr == null) return;
@@ -458,60 +462,60 @@ class AlarmScreenView extends StatelessWidget {
     }
 
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-      settingsGroup(c, uiText(c, 'Fajr alarm'), [
-        SetRow(LucideIcons.sunrise, C.yellow, uiText(c, 'Fajr alarm'),
+      settingsGroup(c, _fajrText('Fajr alarm'), [
+        SetRow(LucideIcons.sunrise, C.yellow, _fajrText('Fajr alarm'),
             value: f.enabled ? (l?.stateOn ?? 'On') : (l?.stateOff ?? 'Off'),
             chevron: false,
             onTap: () => _run(c, () => set(on: !f.enabled),
                 f.enabled
-                    ? uiText(c, 'Fajr alarm off')
-                    : uiText(c, 'Fajr alarm on — sent to the band'))),
+                    ? _fajrText('Fajr alarm off')
+                    : _fajrText('Fajr alarm on — sent to the band'))),
         if (f.enabled) ...[
-          SetRow(LucideIcons.alarmClock, C.green, uiText(c, 'Next'),
+          SetRow(LucideIcons.alarmClock, C.green, _fajrText('Next'),
               value: when, chevron: false),
-          SetRow(LucideIcons.clock, C.blue, uiText(c, 'Minutes after Fajr'),
+          SetRow(LucideIcons.clock, C.blue, _fajrText('Minutes after Fajr'),
               value: '${f.offsetMinutes} min',
               chevron: false,
               onTap: () => _pickNumber(
                   c,
-                  uiText(c, 'Minutes after Fajr'),
+                  _fajrText('Minutes after Fajr'),
                   const [0, 5, 10, 15, 20, 25, 30, 45, 60, 90, 120],
                   (m) => '$m min',
                   (m) => set(off: m))),
-          SetRow(LucideIcons.vibrate, C.orange, uiText(c, 'Buzzes'),
+          SetRow(LucideIcons.vibrate, C.orange, _fajrText('Buzzes'),
               value: '${f.buzzCount}',
               chevron: false,
               onTap: () => _pickNumber(
                   c,
-                  uiText(c, 'Buzzes'),
+                  _fajrText('Buzzes'),
                   [for (var i = 1; i <= 10; i++) i, 15, 20],
                   (n) => '$n',
                   (n) => set(n: n))),
           SetRow(LucideIcons.timer, C.purple,
-              uiText(c, 'Seconds between buzzes'),
+              _fajrText('Seconds between buzzes'),
               value: '${f.gapSeconds} s',
               chevron: false,
               onTap: () => _pickNumber(
                   c,
-                  uiText(c, 'Seconds between buzzes'),
+                  _fajrText('Seconds between buzzes'),
                   [for (var i = 0; i <= FajrAlarmSettings.maxGap; i++) i],
                   (g) => '$g s',
                   (g) => set(gap: g))),
-          SetRow(LucideIcons.mapPin, C.blue, uiText(c, 'Prayer times for'),
+          SetRow(LucideIcons.mapPin, C.blue, _fajrText('Prayer times for'),
               value: where,
               chevron: false,
               onTap: () => _run(c, onRefreshFajr,
-                  uiText(c, 'Prayer times updated'))),
+                  _fajrText('Prayer times updated'))),
         ],
       ]),
       if (f.enabled && connected) ...[
         const SizedBox(height: S.x3),
-        BigButton(uiText(c, 'Test the Fajr buzz (in 1 minute)'),
+        BigButton(_fajrText('Test the Fajr buzz (in 1 minute)'),
             icon: LucideIcons.vibrate,
             color: C.yellow,
             soft: true,
             onTap: () => _run(c, onTestFajr,
-                uiText(c, 'Test alarm set — the band buzzes in about a minute'))),
+                _fajrText('Test alarm set — the band buzzes in about a minute'))),
       ],
     ]);
   }
