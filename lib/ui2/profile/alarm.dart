@@ -34,6 +34,7 @@ import '../../l10n/display_text.dart';
 import '../../state/alarm_schedule.dart';
 import '../../state/app_state.dart';
 import '../../state/clock_format.dart' show formatClock;
+import '../../state/fajr_alarm.dart' show FajrAlarmSettings;
 import '../screens/home_screen.dart' show go, weekdayShortName;
 import '../screens/metric_detail.dart' show detailLinkRow;
 import '../ui2.dart';
@@ -194,6 +195,10 @@ class AlarmScreen extends StatelessWidget {
     // screen doesn't say "sent" while the band still holds the old time.
     final notOnBand = uiText(c,
         "Saved, but the band hasn't taken it yet — it's sent again on the next sync");
+    final noTimes = uiText(
+        c, "Couldn't get prayer times — check the internet connection");
+    final stockPattern = uiText(c,
+        'The band refused the custom pattern — the test (and Fajr) use its standard alarm buzz');
     Future<void> onBand(Future<bool> write) async {
       if (!await write) throw Exception(notOnBand);
     }
@@ -211,6 +216,24 @@ class AlarmScreen extends StatelessWidget {
           app.setScheduleDay(weekday: weekday, smartWindowMinutes: minutes)),
       onTest: app.testAlarmBuzz,
       onCancel: app.disableAlarm,
+      fajr: app.fajrAlarm,
+      fajrNext: app.fajrAlarmNext,
+      fajrPrayer: app.fajrPrayerNext,
+      fajrSource: app.fajrLocationSource,
+      onSetFajr: ({enabled, offsetMinutes, buzzCount, gapSeconds}) async {
+        final onBandNow = await app.setFajrAlarm(
+            enabled: enabled,
+            offsetMinutes: offsetMinutes,
+            buzzCount: buzzCount,
+            gapSeconds: gapSeconds);
+        if (!onBandNow) throw Exception(notOnBand);
+      },
+      onRefreshFajr: () async {
+        if (!await app.refreshFajrTimes()) throw Exception(noTimes);
+      },
+      onTestFajr: () async {
+        if (await app.testFajrAlarm()) throw Exception(stockPattern);
+      },
     );
   }
 }
@@ -241,6 +264,19 @@ class AlarmScreenView extends StatelessWidget {
   final Future<void> Function(int weekday, int minutes)? onSetSmartWindow;
   final Future<void> Function()? onTest, onCancel;
 
+  /// The Fajr alarm (fajr_alarm.dart): its settings, the next buzz time and
+  /// the Fajr behind it, and where the prayer times are for.
+  final FajrAlarmSettings? fajr;
+  final DateTime? fajrNext, fajrPrayer;
+  final String? fajrSource;
+  final Future<void> Function({
+    bool? enabled,
+    int? offsetMinutes,
+    int? buzzCount,
+    int? gapSeconds,
+  })? onSetFajr;
+  final Future<void> Function()? onRefreshFajr, onTestFajr;
+
   const AlarmScreenView({
     super.key,
     this.armedAt,
@@ -254,6 +290,13 @@ class AlarmScreenView extends StatelessWidget {
     this.onSetSmartWindow,
     this.onTest,
     this.onCancel,
+    this.fajr,
+    this.fajrNext,
+    this.fajrPrayer,
+    this.fajrSource,
+    this.onSetFajr,
+    this.onRefreshFajr,
+    this.onTestFajr,
   });
 
   @override
@@ -310,6 +353,10 @@ class AlarmScreenView extends StatelessWidget {
                         icon: _stateIcon(state)),
                   ],
                   const SizedBox(height: S.x4),
+                ],
+                if (fajr != null) ...[
+                  _fajrGroup(c, fajr!),
+                  const SizedBox(height: S.x3),
                 ],
                 if (!connected)
                   StatusCard(
@@ -375,6 +422,114 @@ class AlarmScreenView extends StatelessWidget {
         ]),
       ),
     );
+  }
+
+  /// The Fajr alarm group: on/off, the next Fajr and buzz time, the three
+  /// numbers, the location the times are for, and a one-minute test.
+  Widget _fajrGroup(BuildContext c, FajrAlarmSettings f) {
+    final l = AppLocalizations.of(c);
+    final prayer = fajrPrayer;
+    final buzz = fajrNext;
+    final when = buzz == null
+        ? uiText(c, 'Fetching prayer times…')
+        : '${_whichDay(c, buzz, now ?? DateTime.now())} · '
+            '${uiText(c, 'Fajr')} ${prayer == null ? '' : _hhmm(prayer)} → '
+            '${uiText(c, 'buzz')} ${_hhmm(buzz)}';
+    final where = switch (fajrSource) {
+      'gps' => uiText(c, 'Your location'),
+      'last' => uiText(c, 'Your last location'),
+      'sharjah' => uiText(c, 'Sharjah (no location yet)'),
+      _ => uiText(c, 'Not fetched yet'),
+    };
+    Future<void> set({bool? on, int? off, int? n, int? gap}) async {
+      if (onSetFajr == null) return;
+      await onSetFajr!(
+          enabled: on, offsetMinutes: off, buzzCount: n, gapSeconds: gap);
+    }
+
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      settingsGroup(c, uiText(c, 'Fajr alarm'), [
+        SetRow(LucideIcons.sunrise, C.yellow, uiText(c, 'Fajr alarm'),
+            value: f.enabled ? (l?.stateOn ?? 'On') : (l?.stateOff ?? 'Off'),
+            chevron: false,
+            onTap: () => _run(c, () => set(on: !f.enabled),
+                f.enabled
+                    ? uiText(c, 'Fajr alarm off')
+                    : uiText(c, 'Fajr alarm on — sent to the band'))),
+        if (f.enabled) ...[
+          SetRow(LucideIcons.alarmClock, C.green, uiText(c, 'Next'),
+              value: when, chevron: false),
+          SetRow(LucideIcons.clock, C.blue, uiText(c, 'Minutes after Fajr'),
+              value: '${f.offsetMinutes} min',
+              chevron: false,
+              onTap: () => _pickNumber(
+                  c,
+                  uiText(c, 'Minutes after Fajr'),
+                  const [0, 5, 10, 15, 20, 25, 30, 45, 60, 90, 120],
+                  (m) => '$m min',
+                  (m) => set(off: m))),
+          SetRow(LucideIcons.vibrate, C.orange, uiText(c, 'Buzzes'),
+              value: '${f.buzzCount}',
+              chevron: false,
+              onTap: () => _pickNumber(
+                  c,
+                  uiText(c, 'Buzzes'),
+                  [for (var i = 1; i <= 10; i++) i, 15, 20],
+                  (n) => '$n',
+                  (n) => set(n: n))),
+          SetRow(LucideIcons.timer, C.purple,
+              uiText(c, 'Seconds between buzzes'),
+              value: '${f.gapSeconds} s',
+              chevron: false,
+              onTap: () => _pickNumber(
+                  c,
+                  uiText(c, 'Seconds between buzzes'),
+                  [for (var i = 0; i <= FajrAlarmSettings.maxGap; i++) i],
+                  (g) => '$g s',
+                  (g) => set(gap: g))),
+          SetRow(LucideIcons.mapPin, C.blue, uiText(c, 'Prayer times for'),
+              value: where,
+              chevron: false,
+              onTap: () => _run(c, onRefreshFajr,
+                  uiText(c, 'Prayer times updated'))),
+        ],
+      ]),
+      if (f.enabled && connected) ...[
+        const SizedBox(height: S.x3),
+        BigButton(uiText(c, 'Test the Fajr buzz (in 1 minute)'),
+            icon: LucideIcons.vibrate,
+            color: C.yellow,
+            soft: true,
+            onTap: () => _run(c, onTestFajr,
+                uiText(c, 'Test alarm set — the band buzzes in about a minute'))),
+      ],
+    ]);
+  }
+
+  /// A plain pick-one dialog for one of the Fajr numbers, then save it.
+  Future<void> _pickNumber(
+    BuildContext c,
+    String title,
+    List<int> options,
+    String Function(int) label,
+    Future<void> Function(int) save,
+  ) async {
+    final picked = await showDialog<int>(
+      context: c,
+      builder: (ctx) => SimpleDialog(
+        title: Text(title),
+        children: [
+          for (final o in options)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(ctx, o),
+              child: Text(label(o)),
+            ),
+        ],
+      ),
+    );
+    if (picked == null || !c.mounted) return;
+    await _run(c, () => save(picked),
+        AppLocalizations.of(c)?.alarmSentToBand ?? 'Alarm sent to the band');
   }
 
   Future<void> _pickDayTime(BuildContext c, AlarmScheduleEntry day) async {

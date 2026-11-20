@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../ble/ble_engine.dart';
 import '../ble/ble_state.dart' show AlarmConfirmation;
+import 'fajr_alarm.dart' show FajrPlan;
 
 /// The physical band that received the persisted SET_ALARM.
 const kAlarmRemoteId = 'alarm_remote_id';
@@ -169,6 +170,12 @@ bool inSmartWakeWindow({
         AlarmScheduleEntry(weekday: 0, hour: 0, minute: 0, enabled: false),
   );
   if (entry.smartWindowMinutes <= 0) return null;
+  // Only the weekday slot's own arm gets its smart-wake window: a Fajr alarm
+  // (fajr_alarm.dart) can land on the same weekday at a different time, and
+  // must not inherit an early buzz the user set for their weekday wake time.
+  if (windowEnd.hour != entry.hour || windowEnd.minute != entry.minute) {
+    return null;
+  }
   return (windowEnd: windowEnd, minutes: entry.smartWindowMinutes);
 }
 
@@ -303,13 +310,24 @@ typedef AlarmArmResult = ({
 /// Pure I/O orchestration only: the occurrence math is [nextAlarmOccurrence],
 /// tested independently with no engine, and the wire form is whatever
 /// `engine.setAlarm` already sends (rev1 gen4 / gen5 rich — unchanged here).
+///
+/// [fajr] adds the Fajr alarm (fajr_alarm.dart) as a second source for the
+/// strap's single slot: whichever of the weekly occurrence and the next
+/// Fajr + offset comes first is armed. A Fajr arm carries the user's buzz
+/// pattern; if the band refuses that pattern it is armed again with the stock
+/// one, so a custom rhythm can never cost the wake-up itself.
 Future<AlarmArmResult> armNextScheduledOccurrence({
   required BleEngine engine,
   required List<AlarmScheduleEntry> schedule,
   required int? currentArmedEpoch,
   DateTime? now,
+  FajrPlan? fajr,
 }) async {
-  final next = nextAlarmOccurrence(schedule, now ?? DateTime.now());
+  final weekly = nextAlarmOccurrence(schedule, now ?? DateTime.now());
+  final fajrNext = fajr?.next;
+  final useFajr =
+      fajrNext != null && (weekly == null || fajrNext.isBefore(weekly));
+  final next = useFajr ? fajrNext : weekly;
   if (next == null) {
     // Nothing enabled. Toggling every weekday off individually (rather than
     // an explicit cancel-all) must not leave the strap holding its last arm
@@ -329,7 +347,13 @@ Future<AlarmArmResult> armNextScheduledOccurrence({
   if (epoch == currentArmedEpoch) {
     return (epoch: null, disabled: false, failed: false, echoed: false);
   }
-  final r = await engine.armAlarm(next);
+  var r = useFajr
+      ? await engine.armAlarm(next, haptics: fajr!.haptics)
+      : await engine.armAlarm(next);
+  if (useFajr && r.armed == null) {
+    // The band refused (or never got) the custom pattern — arm the stock one.
+    r = await engine.armAlarm(next);
+  }
   final armed = r.armed;
   if (armed == null) {
     return (epoch: null, disabled: false, failed: true, echoed: false);

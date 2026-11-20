@@ -85,6 +85,7 @@ import '../stress/breath_phases.dart';
 import '../data/auto_backup.dart' as backup
     show runBackupIfDue, selectedBackupFolder, saveBackupFolder, deleteAutomaticBackups;
 import 'alarm_schedule.dart';
+import 'fajr_alarm.dart';
 import 'derive_coordinator.dart';
 import 'gesture_controller.dart';
 import 'live_stream_controller.dart';
@@ -5364,6 +5365,124 @@ class AppState extends ChangeNotifier {
     } catch (e) {
       _log('[alarm] schedule load failed: $e');
     }
+    try {
+      _readFajrState(await SharedPreferences.getInstance());
+    } catch (e) {
+      _log('[fajr] state load failed: $e');
+    }
+  }
+
+  // ── Fajr alarm (fajr_alarm.dart) ──────────────────────────────────────────
+  // A second source for the strap's single alarm slot: the next Fajr + offset,
+  // from AlAdhan (method 16, UAE) at the phone's location. Whichever of it and
+  // the weekly schedule comes first is armed by [_armNextAlarmOccurrence].
+
+  FajrAlarmSettings _fajr = const FajrAlarmSettings();
+  FajrAlarmSettings get fajrAlarm => _fajr;
+
+  DateTime? _fajrNext;
+
+  /// The next Fajr + offset the cache knows about (null when off/unknown).
+  DateTime? get fajrAlarmNext => _fajrNext;
+
+  /// The Fajr time behind [fajrAlarmNext].
+  DateTime? get fajrPrayerNext => _fajrNext
+      ?.subtract(Duration(minutes: _fajr.offsetMinutes));
+
+  String? _fajrSource;
+
+  /// Where the cached times are for: "gps", "last" (an earlier fix) or
+  /// "sharjah" (fallback).
+  String? get fajrLocationSource => _fajrSource;
+
+  DateTime? _fajrFetchedAt;
+  DateTime? get fajrFetchedAt => _fajrFetchedAt;
+
+  void _readFajrState(SharedPreferences prefs) {
+    _fajr = FajrAlarmSettings.load(prefs);
+    _fajrNext = loadFajrPlan(prefs, DateTime.now()).next;
+    _fajrSource = FajrTimes.coordsSource(prefs);
+    _fajrFetchedAt = FajrTimes.lastFetched(prefs);
+  }
+
+  /// Change the Fajr alarm and re-arm when connected. Switching it on fetches
+  /// prayer times at the phone's location (asking for location permission the
+  /// first time). Returns false when the band does not hold the result yet —
+  /// offline or the write failed — the next connect/sync arms it.
+  Future<bool> setFajrAlarm({
+    bool? enabled,
+    int? offsetMinutes,
+    int? buzzCount,
+    int? gapSeconds,
+  }) async {
+    for (var d = _disableInFlight; d != null; d = _disableInFlight) {
+      await d;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final was = _fajr;
+    final next = was.copyWith(
+      enabled: enabled,
+      offsetMinutes: offsetMinutes,
+      buzzCount: buzzCount,
+      gapSeconds: gapSeconds,
+    );
+    await next.save(prefs);
+    if (next.enabled &&
+        (!was.enabled || FajrTimes.needsRefresh(prefs, DateTime.now()))) {
+      final ok =
+          await FajrTimes.refresh(prefs, useGps: true, askPermission: true);
+      if (!ok) _log('[fajr] prayer-time fetch failed; using the cache.');
+    }
+    _readFajrState(prefs);
+    notifyListeners();
+    if (!isConnected) return false;
+    // While on, rewrite even when the instant is unchanged: the buzz pattern
+    // may be what changed. Off goes the normal way, which DISABLEs the strap
+    // when nothing else is scheduled.
+    return _armNextAlarmOccurrence(force: next.enabled);
+  }
+
+  /// Fetch prayer times again now (e.g. after travelling). Returns whether
+  /// they arrived.
+  Future<bool> refreshFajrTimes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final ok =
+        await FajrTimes.refresh(prefs, useGps: true, askPermission: true);
+    _readFajrState(prefs);
+    notifyListeners();
+    if (ok && _fajr.enabled && isConnected) {
+      await _armNextAlarmOccurrence(force: true);
+    }
+    return ok;
+  }
+
+  /// Arm the band's alarm one minute from now with the Fajr buzz pattern, so
+  /// the user can feel the exact rhythm the band will use at Fajr. The real
+  /// next alarm is written back once the test has fired (the strap's fired
+  /// event re-arms) and, as a backstop, 90 s from now. Returns true when the
+  /// band refused the custom pattern and the stock one was used instead.
+  Future<bool> testFajrAlarm() async {
+    if (!isConnected) throw Exception('Connect to your strap first');
+    final at = DateTime.now().add(const Duration(minutes: 1));
+    final haptics = fajrHapticPattern(
+        buzzCount: _fajr.buzzCount, gapSeconds: _fajr.gapSeconds);
+    var r = await engine.armAlarm(at, haptics: haptics);
+    var usedStock = false;
+    if (r.armed == null) {
+      r = await engine.armAlarm(at);
+      usedStock = true;
+    }
+    if (r.armed == null) {
+      throw Exception('The band did not take the test alarm — try again');
+    }
+    // The strap's slot now holds the test, not the persisted arm: forget the
+    // persisted one so every later re-arm writes the real next alarm again.
+    await _clearArmedAlarmState();
+    notifyListeners();
+    Timer(const Duration(seconds: 90), () {
+      if (isConnected) unawaited(_armNextAlarmOccurrence(force: true));
+    });
+    return usedStock;
   }
 
   /// One-time 49→50 seed: a legacy single-alarm value with nothing yet in
@@ -5475,7 +5594,8 @@ class AppState extends ChangeNotifier {
 
   /// True when the band now holds what the schedule says (armed, disabled,
   /// or already matching); false when offline or a needed write failed.
-  Future<bool> _armNextAlarmOccurrence({int? firedEpoch}) async {
+  Future<bool> _armNextAlarmOccurrence(
+      {int? firedEpoch, bool force = false}) async {
     if (!isConnected) return false;
     try {
       // A headless re-arm (background_sync.dart) can have rewritten
@@ -5505,11 +5625,18 @@ class AppState extends ChangeNotifier {
       // the write waits for its reply; the result then belongs to a band that
       // is no longer the paired one (see [_onArmed]).
       final armedFor = paired?.remoteId;
+      // Fajr alarm: top up the prayer-time cache when it runs low (GPS only
+      // if permission was already given — never a prompt from a connect).
+      await refreshFajrTimesIfNeeded(prefs, useGps: true);
+      final from = alarmRearmFrom(DateTime.now(), firedEpoch);
+      final fajr = loadFajrPlan(prefs, from);
+      _readFajrState(prefs);
       final result = await armNextScheduledOccurrence(
         engine: engine,
         schedule: _schedule,
-        currentArmedEpoch: _savedAlarm ?? device.alarmEpoch,
-        now: alarmRearmFrom(DateTime.now(), firedEpoch),
+        currentArmedEpoch: force ? null : (_savedAlarm ?? device.alarmEpoch),
+        now: from,
+        fajr: fajr,
       );
       if (result.disabled) {
         // Every weekday got disabled since the last arm — the strap doesn't
@@ -6159,6 +6286,10 @@ class AppState extends ChangeNotifier {
     await prefs.setBool('alarm_schedule_cleared', true);
     await LocalDb.clearAlarmSchedule();
     _schedule = fillDefaultAlarmSchedule(const []);
+    // Cancel means everything: the Fajr alarm would otherwise re-arm the band
+    // on the very next connect.
+    await _fajr.copyWith(enabled: false).save(prefs);
+    _readFajrState(prefs);
     notifyListeners();
     // Nothing is scheduled now, so the 7pm "no alarm set for tonight" check
     // armed earlier today must go too.
