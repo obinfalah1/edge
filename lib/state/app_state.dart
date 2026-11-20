@@ -5536,7 +5536,7 @@ class AppState extends ChangeNotifier {
     bool? enabled,
     int? offsetMinutes,
     int? buzzCount,
-    int? gapSeconds,
+    int? pauseSteps,
   }) async {
     for (var d = _disableInFlight; d != null; d = _disableInFlight) {
       await d;
@@ -5547,7 +5547,7 @@ class AppState extends ChangeNotifier {
       enabled: enabled,
       offsetMinutes: offsetMinutes,
       buzzCount: buzzCount,
-      gapSeconds: gapSeconds,
+      pauseSteps: pauseSteps,
     );
     await next.save(prefs);
     if (next.enabled &&
@@ -5588,7 +5588,7 @@ class AppState extends ChangeNotifier {
     if (!isConnected) throw Exception('Connect to your strap first');
     final at = DateTime.now().add(const Duration(minutes: 1));
     final haptics = fajrHapticPattern(
-        buzzCount: _fajr.buzzCount, gapSeconds: _fajr.gapSeconds);
+        buzzCount: _fajr.buzzCount, pauseSteps: _fajr.pauseSteps);
     var r = await engine.armAlarm(at, haptics: haptics);
     var usedStock = false;
     if (r.armed == null) {
