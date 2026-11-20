@@ -99,7 +99,7 @@ Map<String, Widget> _cases() => {
           units: 'Metric',
           appearance: 'Dark',
           phoneSteps: true,
-          appIcon: AppIconChoice.colourful),
+          appIcon: AppIconChoice.orbit),
       // The alarm's three confirmation states are the point of the screen: it
       // must not draw a confident tick over an alarm the band never
       // acknowledged.

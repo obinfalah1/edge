@@ -19,27 +19,27 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 /// The icons compiled into the iOS asset catalog. The wire names are the
-/// `.appiconset` names — `null` is the primary icon, which is the colourful one.
+/// `.appiconset` names — `null` is the primary icon, the plain Orbit.
 enum AppIconChoice {
-  colourful(null, 'Colourful'),
-  blackAndWhite('AppIconBW', 'Black and white');
+  orbit(null, 'Orbit'),
+  orbitGlass('AppIconGlass', 'Orbit Glass'),
+  orbitTinted('AppIconTinted', 'Orbit Tinted');
 
   const AppIconChoice(this.wireName, this.label);
 
-  /// The alternate-icon name iOS knows it by; null for the primary icon.
   final String? wireName;
   final String label;
 
-  /// The bundled preview of this icon, drawn in the settings row.
   String get asset => switch (this) {
-        AppIconChoice.colourful => 'assets/images/icon.png',
-        AppIconChoice.blackAndWhite => 'assets/images/icon_bw.png',
-      };
+    AppIconChoice.orbit => 'assets/images/icon_orbit.png',
+    AppIconChoice.orbitGlass => 'assets/images/icon_orbit_glass.png',
+    AppIconChoice.orbitTinted => 'assets/images/icon_orbit_tinted.png',
+  };
 
-  static AppIconChoice fromWireName(String? name) =>
-      name == AppIconChoice.blackAndWhite.wireName
-          ? AppIconChoice.blackAndWhite
-          : AppIconChoice.colourful;
+  /// An icon iOS reports that is not one of these (the older black-and-white
+  /// one) reads as the main icon, so picking one always moves off it.
+  static AppIconChoice fromWireName(String? name) => AppIconChoice.values
+      .firstWhere((c) => c.wireName == name, orElse: () => AppIconChoice.orbit);
 }
 
 class AppIcon {
@@ -60,14 +60,15 @@ class AppIcon {
   /// What the home screen is showing right now, straight from iOS.
   static Future<AppIconChoice> current() async {
     if (defaultTargetPlatform != TargetPlatform.iOS) {
-      return AppIconChoice.colourful;
+      return AppIconChoice.orbit;
     }
     try {
       return AppIconChoice.fromWireName(
-          await _ch.invokeMethod<String>('current'));
+        await _ch.invokeMethod<String>('current'),
+      );
     } catch (e) {
       debugPrint('[app_icon] current failed: $e');
-      return AppIconChoice.colourful;
+      return AppIconChoice.orbit;
     }
   }
 
