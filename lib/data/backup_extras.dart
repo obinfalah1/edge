@@ -54,7 +54,8 @@ const Map<String, String> kPrefsNotBackedUp = {
   'fajr_alarm_fetched_at_ms': 'when this phone last fetched prayer times',
   'fajr_alarm_coords_v1': 'the location this phone fetched prayer times for',
   'fajr_alarm_coords_source': 'how this phone found that location',
-  'buzz_timer_epoch': 'a one-off buzz timer set from Siri; over within hours',
+  'band_timer_epoch': 'a running band timer; over within the day',
+  'band_timer_buzz_count': 'the running band timer’s buzz count, set from Siri',
   'smart_wake_fired_epoch': 'records that the early buzz fired for one arm on the old band; '
       'a restored latch would suppress the buzz on the next night\'s arm',
   'health_upload_last_ts': 'upload cursor for this installation',

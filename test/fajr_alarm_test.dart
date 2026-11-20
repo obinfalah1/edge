@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -16,36 +15,10 @@ String _fixture() =>
 
 /// Official awqaf.gov.ae Sharjah (Al Majaz) Fajr, November 2026.
 const _awqafNov2026 = [
-  '05:07',
-  '05:08',
-  '05:08',
-  '05:09',
-  '05:10',
-  '05:10',
-  '05:11',
-  '05:11',
-  '05:12',
-  '05:12',
-  '05:13',
-  '05:13',
-  '05:14',
-  '05:15',
-  '05:15',
-  '05:16',
-  '05:16',
-  '05:17',
-  '05:18',
-  '05:18',
-  '05:19',
-  '05:19',
-  '05:20',
-  '05:21',
-  '05:21',
-  '05:22',
-  '05:22',
-  '05:23',
-  '05:24',
-  '05:24',
+  '05:07', '05:08', '05:08', '05:09', '05:10', '05:10', '05:11', '05:11',
+  '05:12', '05:12', '05:13', '05:13', '05:14', '05:15', '05:15', '05:16',
+  '05:16', '05:17', '05:18', '05:18', '05:19', '05:19', '05:20', '05:21',
+  '05:21', '05:22', '05:22', '05:23', '05:24', '05:24',
 ];
 
 /// SET_ALARM_TIME bodies a fake WHOOP 5 received.
@@ -75,21 +48,21 @@ void main() {
     test('reads every day as an exact instant in Asia/Dubai', () {
       final days = FajrTimes.parseCalendar(_fixture());
       expect(days.length, 30);
-      final nov20 = DateTime.fromMillisecondsSinceEpoch(
-        days['2026-11-20']! * 1000,
-      ).toUtc();
+      final nov20 =
+          DateTime.fromMillisecondsSinceEpoch(days['2026-11-20']! * 1000)
+              .toUtc();
       // 05:18 +04:00 == 01:18 UTC, whatever zone the test machine is in.
       expect(nov20, DateTime.utc(2026, 11, 20, 1, 18));
     });
 
-    test('matches the official awqaf.gov.ae Sharjah table within 1 minute', () {
+    test('matches the official awqaf.gov.ae Sharjah table within 1 minute',
+        () {
       final days = FajrTimes.parseCalendar(_fixture());
       var exact = 0;
       for (var d = 1; d <= 30; d++) {
         final key = '2026-11-${d.toString().padLeft(2, '0')}';
-        final utc = DateTime.fromMillisecondsSinceEpoch(
-          days[key]! * 1000,
-        ).toUtc();
+        final utc =
+            DateTime.fromMillisecondsSinceEpoch(days[key]! * 1000).toUtc();
         final dubai = utc.add(const Duration(hours: 4));
         final p = _awqafNov2026[d - 1].split(':');
         final official = int.parse(p[0]) * 60 + int.parse(p[1]);
@@ -112,26 +85,21 @@ void main() {
 
     test('is Fajr + offset of the same morning before it passes', () {
       final now = DateTime.utc(2026, 11, 20, 0, 0); // 04:00 Dubai
-      expect(
-        nextFajrAlarm(cache, on, now)!.toUtc(),
-        DateTime.utc(2026, 11, 20, 1, 33),
-      ); // 05:33 Dubai
+      expect(nextFajrAlarm(cache, on, now)!.toUtc(),
+          DateTime.utc(2026, 11, 20, 1, 33)); // 05:33 Dubai
     });
 
     test('rolls to the next morning once it has passed', () {
       final now = DateTime.utc(2026, 11, 20, 1, 33); // exactly 05:33
-      expect(
-        nextFajrAlarm(cache, on, now)!.toUtc(),
-        DateTime.utc(2026, 11, 21, 1, 34),
-      ); // 21st: 05:19 + 15
+      expect(nextFajrAlarm(cache, on, now)!.toUtc(),
+          DateTime.utc(2026, 11, 21, 1, 34)); // 21st: 05:19 + 15
     });
 
     test('follows the offset setting', () {
       final now = DateTime.utc(2026, 11, 20, 0, 0);
       expect(
-        nextFajrAlarm(cache, on.copyWith(offsetMinutes: 0), now)!.toUtc(),
-        DateTime.utc(2026, 11, 20, 1, 18),
-      );
+          nextFajrAlarm(cache, on.copyWith(offsetMinutes: 0), now)!.toUtc(),
+          DateTime.utc(2026, 11, 20, 1, 18));
     });
 
     test('is null when switched off or nothing is cached', () {
@@ -144,10 +112,8 @@ void main() {
   group('settings', () {
     test('defaults: 15 min after Fajr, 3 buzzes, longest pause', () {
       const s = FajrAlarmSettings();
-      expect(
-        [s.enabled, s.offsetMinutes, s.buzzCount, s.pauseSteps],
-        [false, 15, 3, 7],
-      );
+      expect([s.enabled, s.offsetMinutes, s.buzzCount, s.pauseSteps],
+          [false, 15, 3, 7]);
     });
 
     test('round-trip through SharedPreferences, clamped to range', () async {
@@ -155,17 +121,11 @@ void main() {
       final prefs = await SharedPreferences.getInstance();
       await const FajrAlarmSettings()
           .copyWith(
-            enabled: true,
-            offsetMinutes: 500,
-            buzzCount: 0,
-            pauseSteps: 99,
-          )
+              enabled: true, offsetMinutes: 500, buzzCount: 0, pauseSteps: 99)
           .save(prefs);
       final s = FajrAlarmSettings.load(prefs);
-      expect(
-        [s.enabled, s.offsetMinutes, s.buzzCount, s.pauseSteps],
-        [true, 120, 1, 7],
-      );
+      expect([s.enabled, s.offsetMinutes, s.buzzCount, s.pauseSteps],
+          [true, 120, 1, 7]);
     });
   });
 
@@ -179,11 +139,8 @@ void main() {
         for (var g = 1; g <= FajrAlarmSettings.maxPause; g++) {
           final p = fajrHapticPattern(buzzCount: n, pauseSteps: g);
           expect(p.length, 12);
-          expect(
-            p.sublist(0, 8).every(accepted.contains),
-            isTrue,
-            reason: '$p',
-          );
+          expect(p.sublist(0, 8).every(accepted.contains), isTrue,
+              reason: '$p');
           expect(p[11], greaterThanOrEqualTo(30), reason: 'stock duration');
         }
       }
@@ -212,98 +169,83 @@ void main() {
       haptics: fajrHapticPattern(buzzCount: 3, pauseSteps: 7),
     );
     List<AlarmScheduleEntry> weekly({required bool enabled}) => [
-      for (var w = 0; w < 7; w++)
-        AlarmScheduleEntry(weekday: w, hour: 7, minute: 0, enabled: enabled),
-    ];
+          for (var w = 0; w < 7; w++)
+            AlarmScheduleEntry(
+                weekday: w, hour: 7, minute: 0, enabled: enabled),
+        ];
 
     BleEngine engine() =>
         BleEngine(onRecord: (_, _) async {}, onState: (_) {}, log: (_) {});
 
-    test(
-      'Fajr wins when it comes first, with the custom pattern',
-      () async {
-        final e = engine();
-        final sets = _installGen5(e);
-        final r = await armNextScheduledOccurrence(
-          engine: e,
-          schedule: weekly(enabled: true),
-          currentArmedEpoch: null,
-          now: now,
-          fajr: plan,
-        );
-        expect(r.failed, isFalse);
-        expect(r.epoch, plan.next!.millisecondsSinceEpoch ~/ 1000);
-        expect(sets, hasLength(1));
-        // rich gen5 body: [0x04][idx][u32 sec][u16 subsec][12 haptics][crescendo]
-        expect(sets.single.sublist(8, 20), plan.haptics);
-      },
-      timeout: const Timeout(Duration(seconds: 60)),
-    );
+    test('Fajr wins when it comes first, with the custom pattern', () async {
+      final e = engine();
+      final sets = _installGen5(e);
+      final r = await armNextScheduledOccurrence(
+        engine: e,
+        schedule: weekly(enabled: true),
+        currentArmedEpoch: null,
+        now: now,
+        fajr: plan,
+      );
+      expect(r.failed, isFalse);
+      expect(r.epoch, plan.next!.millisecondsSinceEpoch ~/ 1000);
+      expect(sets, hasLength(1));
+      // rich gen5 body: [0x04][idx][u32 sec][u16 subsec][12 haptics][crescendo]
+      expect(sets.single.sublist(8, 20), plan.haptics);
+    }, timeout: const Timeout(Duration(seconds: 60)));
 
-    test(
-      'the weekly alarm wins when it comes first, stock pattern',
-      () async {
-        final e = engine();
-        final sets = _installGen5(e);
-        final early = DateTime.utc(2026, 11, 20, 0, 0).toLocal();
-        final r = await armNextScheduledOccurrence(
-          engine: e,
-          schedule: [
-            for (var w = 0; w < 7; w++)
-              AlarmScheduleEntry(
+    test('the weekly alarm wins when it comes first, stock pattern', () async {
+      final e = engine();
+      final sets = _installGen5(e);
+      final early = DateTime.utc(2026, 11, 20, 0, 0).toLocal();
+      final r = await armNextScheduledOccurrence(
+        engine: e,
+        schedule: [
+          for (var w = 0; w < 7; w++)
+            AlarmScheduleEntry(
                 weekday: w,
                 hour: early.add(const Duration(minutes: 10)).hour,
-                minute: early.add(const Duration(minutes: 10)).minute,
-              ),
-          ],
-          currentArmedEpoch: null,
-          now: early,
-          fajr: plan,
-        );
-        expect(r.failed, isFalse);
-        expect(r.epoch, isNot(plan.next!.millisecondsSinceEpoch ~/ 1000));
-        expect(sets.single.sublist(8, 20), AlarmPayloads.defaultHaptics);
-      },
-      timeout: const Timeout(Duration(seconds: 60)),
-    );
+                minute: early.add(const Duration(minutes: 10)).minute),
+        ],
+        currentArmedEpoch: null,
+        now: early,
+        fajr: plan,
+      );
+      expect(r.failed, isFalse);
+      expect(r.epoch, isNot(plan.next!.millisecondsSinceEpoch ~/ 1000));
+      expect(sets.single.sublist(8, 20), AlarmPayloads.defaultHaptics);
+    }, timeout: const Timeout(Duration(seconds: 60)));
 
-    test(
-      'Fajr alone arms the band with nothing on the weekly schedule',
-      () async {
-        final e = engine();
-        final sets = _installGen5(e);
-        final r = await armNextScheduledOccurrence(
-          engine: e,
-          schedule: weekly(enabled: false),
-          currentArmedEpoch: null,
-          now: now,
-          fajr: plan,
-        );
-        expect(r.epoch, plan.next!.millisecondsSinceEpoch ~/ 1000);
-        expect(sets, hasLength(1));
-      },
-      timeout: const Timeout(Duration(seconds: 60)),
-    );
+    test('Fajr alone arms the band with nothing on the weekly schedule',
+        () async {
+      final e = engine();
+      final sets = _installGen5(e);
+      final r = await armNextScheduledOccurrence(
+        engine: e,
+        schedule: weekly(enabled: false),
+        currentArmedEpoch: null,
+        now: now,
+        fajr: plan,
+      );
+      expect(r.epoch, plan.next!.millisecondsSinceEpoch ~/ 1000);
+      expect(sets, hasLength(1));
+    }, timeout: const Timeout(Duration(seconds: 60)));
 
-    test(
-      'a refused custom pattern is retried with the stock one',
-      () async {
-        final e = engine();
-        final sets = _installGen5(e, accept: false);
-        final r = await armNextScheduledOccurrence(
-          engine: e,
-          schedule: weekly(enabled: false),
-          currentArmedEpoch: null,
-          now: now,
-          fajr: plan,
-        );
-        expect(r.failed, isTrue, reason: 'this fake band takes nothing');
-        expect(sets, hasLength(2));
-        expect(sets[0].sublist(8, 20), plan.haptics);
-        expect(sets[1].sublist(8, 20), AlarmPayloads.defaultHaptics);
-      },
-      timeout: const Timeout(Duration(seconds: 60)),
-    );
+    test('a refused custom pattern is retried with the stock one', () async {
+      final e = engine();
+      final sets = _installGen5(e, accept: false);
+      final r = await armNextScheduledOccurrence(
+        engine: e,
+        schedule: weekly(enabled: false),
+        currentArmedEpoch: null,
+        now: now,
+        fajr: plan,
+      );
+      expect(r.failed, isTrue, reason: 'this fake band takes nothing');
+      expect(sets, hasLength(2));
+      expect(sets[0].sublist(8, 20), plan.haptics);
+      expect(sets[1].sublist(8, 20), AlarmPayloads.defaultHaptics);
+    }, timeout: const Timeout(Duration(seconds: 60)));
 
     test('an unchanged arm is not rewritten', () async {
       final e = engine();
@@ -320,96 +262,23 @@ void main() {
     });
   });
 
-  group('buzz timer', () {
-    final cache = FajrTimes.parseCalendar(_fixture());
-    final now = DateTime.utc(2026, 11, 20, 0, 0); // 04:00 Dubai, Fajr+15 05:33
-
-    Future<SharedPreferences> prefsWith({required bool fajrOn}) async {
-      SharedPreferences.setMockInitialValues({});
-      final prefs = await SharedPreferences.getInstance();
-      await FajrAlarmSettings(enabled: fajrOn, buzzCount: 5).save(prefs);
-      await prefs.setString('fajr_alarm_cache_v1', jsonEncode(cache));
-      return prefs;
-    }
-
-    test(
-      'a timer before Fajr is what gets armed, with the Fajr pattern',
-      () async {
-        final prefs = await prefsWith(fajrOn: true);
-        final at = await BuzzTimer.start(prefs, 20, now: now);
-        expect(at.toUtc(), DateTime.utc(2026, 11, 20, 0, 20));
-        final plan = loadFajrPlan(prefs, now);
-        expect(plan.next, at);
-        expect(plan.haptics, fajrHapticPattern(buzzCount: 5, pauseSteps: 7));
-      },
-    );
-
-    test('Fajr comes back once the timer has passed', () async {
-      final prefs = await prefsWith(fajrOn: true);
-      await BuzzTimer.start(prefs, 20, now: now);
-      final later = now.add(const Duration(minutes: 21));
-      expect(BuzzTimer.pending(prefs, later), isNull);
-      expect(
-        loadFajrPlan(prefs, later).next!.toUtc(),
-        DateTime.utc(2026, 11, 20, 1, 33),
-      );
-    });
-
-    test('a timer after Fajr waits its turn', () async {
-      final prefs = await prefsWith(fajrOn: true);
-      await BuzzTimer.start(prefs, 120, now: now); // 06:00 Dubai
-      expect(
-        loadFajrPlan(prefs, now).next!.toUtc(),
-        DateTime.utc(2026, 11, 20, 1, 33),
-      );
-    });
-
-    test('works with the Fajr alarm off, and cancels', () async {
-      final prefs = await prefsWith(fajrOn: false);
-      final at = await BuzzTimer.start(prefs, 5, now: now);
-      expect(loadFajrPlan(prefs, now).next, at);
-      await BuzzTimer.cancel(prefs);
-      expect(loadFajrPlan(prefs, now).next, isNull);
-    });
-
-    test('minutes are clamped to 1..720', () async {
-      final prefs = await prefsWith(fajrOn: false);
-      expect(
-        (await BuzzTimer.start(prefs, 0, now: now)).difference(now),
-        const Duration(minutes: 1),
-      );
-      expect(
-        (await BuzzTimer.start(prefs, 9999, now: now)).difference(now),
-        const Duration(minutes: 720),
-      );
-    });
-  });
-
   test('a weekday smart-wake window does not attach to a Fajr arm', () {
     final fajrAt = DateTime(2026, 11, 20, 5, 33);
     final schedule = [
       for (var w = 0; w < 7; w++)
         AlarmScheduleEntry(
-          weekday: w,
-          hour: 7,
-          minute: 0,
-          smartWindowMinutes: 30,
-        ),
+            weekday: w, hour: 7, minute: 0, smartWindowMinutes: 30),
     ];
     expect(
-      armedSmartWakeWindow(
-        epoch: fajrAt.millisecondsSinceEpoch ~/ 1000,
-        schedule: schedule,
-      ),
-      isNull,
-    );
+        armedSmartWakeWindow(
+            epoch: fajrAt.millisecondsSinceEpoch ~/ 1000, schedule: schedule),
+        isNull);
     final weeklyAt = DateTime(2026, 11, 20, 7, 0);
     expect(
-      armedSmartWakeWindow(
-        epoch: weeklyAt.millisecondsSinceEpoch ~/ 1000,
-        schedule: schedule,
-      )!.minutes,
-      30,
-    );
+        armedSmartWakeWindow(
+                epoch: weeklyAt.millisecondsSinceEpoch ~/ 1000,
+                schedule: schedule)!
+            .minutes,
+        30);
   });
 }

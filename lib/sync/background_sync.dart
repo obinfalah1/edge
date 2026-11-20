@@ -40,6 +40,7 @@ import '../ecg/ecg_transport.dart';
 import '../notify/notification_center.dart';
 import '../notify/notification_event.dart';
 import '../state/alarm_schedule.dart';
+import '../state/band_timer.dart';
 import '../state/fajr_alarm.dart';
 import 'band_ownership.dart';
 import 'high_freq_wake_window.dart';
@@ -303,6 +304,7 @@ Future<void> rearmHeadlessAlarm(BleEngine engine, PairedDevice paired) async {
         schedule: schedule,
         currentArmedEpoch: persistedAlarmEpoch(prefs, remoteId),
         fajr: fajr,
+        timer: loadBandTimerPlan(prefs, DateTime.now()),
       ),
       LocalDb.alarmSetConfirmedSince,
       remoteId: remoteId,

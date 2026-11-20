@@ -85,6 +85,7 @@ import '../stress/breath_phases.dart';
 import '../data/auto_backup.dart' as backup
     show runBackupIfDue, selectedBackupFolder, saveBackupFolder, deleteAutomaticBackups;
 import 'alarm_schedule.dart';
+import 'band_timer.dart';
 import 'fajr_alarm.dart';
 import 'derive_coordinator.dart';
 import 'gesture_controller.dart';
@@ -2086,8 +2087,7 @@ class AppState extends ChangeNotifier {
     // skip the headless BLE path (it would fight FBP for the peripheral) — route
     // them to a catch-up pull over the existing live connection instead.
     IosBgTask.foregroundPull = foregroundCatchUp;
-    IosShortcutSync.foregroundRearm =
-        () => _armNextAlarmOccurrence(force: true);
+    IosShortcutSync.foregroundRearm = () => _armNextAlarmOccurrence();
     IosShortcutSync.attachForeground(syncForShortcut, () => engine);
     taskerBridge; // force init: register the method channel handler
     // A paired sensor's live beats, into the same trace as the band's. Touches
@@ -5402,9 +5402,7 @@ class AppState extends ChangeNotifier {
 
   void _readFajrState(SharedPreferences prefs) {
     _fajr = FajrAlarmSettings.load(prefs);
-    // Fajr only: the plan's `next` can be a buzz timer.
-    _fajrNext =
-        nextFajrAlarm(FajrTimes.readCache(prefs), _fajr, DateTime.now());
+    _fajrNext = loadFajrPlan(prefs, DateTime.now()).next;
     _fajrSource = FajrTimes.coordsSource(prefs);
     _fajrFetchedAt = FajrTimes.lastFetched(prefs);
   }
@@ -5641,6 +5639,7 @@ class AppState extends ChangeNotifier {
         currentArmedEpoch: force ? null : (_savedAlarm ?? device.alarmEpoch),
         now: from,
         fajr: fajr,
+        timer: loadBandTimerPlan(prefs, from),
       );
       if (result.disabled) {
         // Every weekday got disabled since the last arm — the strap doesn't

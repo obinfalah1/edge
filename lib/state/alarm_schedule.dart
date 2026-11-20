@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../ble/ble_engine.dart';
 import '../ble/ble_state.dart' show AlarmConfirmation;
+import 'band_timer.dart' show BandTimerPlan;
 import 'fajr_alarm.dart' show FajrPlan;
 
 /// The physical band that received the persisted SET_ALARM.
@@ -322,12 +323,23 @@ Future<AlarmArmResult> armNextScheduledOccurrence({
   required int? currentArmedEpoch,
   DateTime? now,
   FajrPlan? fajr,
+  BandTimerPlan? timer,
 }) async {
   final weekly = nextAlarmOccurrence(schedule, now ?? DateTime.now());
   final fajrNext = fajr?.next;
-  final useFajr =
+  var useFajr =
       fajrNext != null && (weekly == null || fajrNext.isBefore(weekly));
-  final next = useFajr ? fajrNext : weekly;
+  var next = useFajr ? fajrNext : weekly;
+  // The band timer (band_timer.dart) borrows the slot only while it ends
+  // first; with no timer running this is exactly the weekly-vs-Fajr choice.
+  final timerNext = timer?.next;
+  final useTimer =
+      timerNext != null && (next == null || timerNext.isBefore(next));
+  if (useTimer) {
+    next = timerNext;
+    useFajr = false;
+  }
+  final custom = useTimer ? timer!.haptics : (useFajr ? fajr!.haptics : null);
   if (next == null) {
     // Nothing enabled. Toggling every weekday off individually (rather than
     // an explicit cancel-all) must not leave the strap holding its last arm
@@ -347,10 +359,10 @@ Future<AlarmArmResult> armNextScheduledOccurrence({
   if (epoch == currentArmedEpoch) {
     return (epoch: null, disabled: false, failed: false, echoed: false);
   }
-  var r = useFajr
-      ? await engine.armAlarm(next, haptics: fajr!.haptics)
+  var r = custom != null
+      ? await engine.armAlarm(next, haptics: custom)
       : await engine.armAlarm(next);
-  if (useFajr && r.armed == null) {
+  if (custom != null && r.armed == null) {
     // The band refused (or never got) the custom pattern — arm the stock one.
     r = await engine.armAlarm(next);
   }

@@ -12,7 +12,7 @@ import '../compute/derivation_engine.dart';
 import '../data/db.dart';
 import '../data/local_repository_impl.dart';
 import '../state/alarm_schedule.dart' show persistedAlarmEpoch;
-import '../state/fajr_alarm.dart' show BuzzTimer;
+import '../state/band_timer.dart' show BandTimer;
 import '../state/prefs.dart';
 import '../widget/widget_service.dart';
 import 'background_sync.dart';
@@ -71,7 +71,10 @@ class IosShortcutSync {
         case 'buzz':
           return buzz();
         case 'buzzTimer':
-          return buzzTimer((args['minutes'] as int?) ?? 0);
+          return buzzTimer(
+            (args['minutes'] as int?) ?? 0,
+            buzzes: (args['buzzes'] as int?) ?? BandTimer.defaultCount,
+          );
         case 'buzzTimerStatus':
           return buzzTimerStatus();
         default:
@@ -107,15 +110,22 @@ class IosShortcutSync {
   /// native side runs a sync, whose connect re-arms from the same plan.
   /// Replies with the timer's unix second (0 when cancelled) and 'armed',
   /// 'failed' or 'needsSync'.
-  static Future<Map<String, Object>> buzzTimer(int minutes) async {
+  static Future<Map<String, Object>> buzzTimer(
+    int minutes, {
+    int buzzes = BandTimer.defaultCount,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
     var at = 0;
     if (minutes > 0) {
       at =
-          (await BuzzTimer.start(prefs, minutes)).millisecondsSinceEpoch ~/
+          (await BandTimer.start(
+            prefs,
+            Duration(minutes: minutes),
+            buzzes: buzzes,
+          )).millisecondsSinceEpoch ~/
           1000;
     } else {
-      await BuzzTimer.cancel(prefs);
+      await BandTimer.cancel(prefs);
     }
     final engine = foregroundEngine?.call();
     final rearm = foregroundRearm;
@@ -139,7 +149,7 @@ class IosShortcutSync {
     final paired = await PairedDevice.load();
     final armed = persistedAlarmEpoch(prefs, paired?.remoteId);
     if (armed == null) return 'none';
-    return armed == BuzzTimer.storedEpoch(prefs) ? 'timer' : 'other';
+    return armed == BandTimer.storedEpoch(prefs) ? 'timer' : 'other';
   }
 
   static Future<ShortcutSyncResult> run(String id, Duration budget) async {
