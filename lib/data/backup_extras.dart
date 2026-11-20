@@ -102,7 +102,7 @@ class ImportSummary extends MapView<String, int> {
 const Map<String, String> kPrefTypes = {
   'fajr_alarm_buzz_count': 'int',
   'fajr_alarm_enabled': 'bool',
-  'fajr_alarm_gap_sec': 'int',
+  'fajr_alarm_pause_steps': 'int',
   'fajr_alarm_offset_min': 'int',
   'activity.nap_auto_log_since_sec': 'int',
   'ai.journal_done_day': 'string',

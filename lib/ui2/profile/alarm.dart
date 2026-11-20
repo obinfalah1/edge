@@ -220,12 +220,12 @@ class AlarmScreen extends StatelessWidget {
       fajrNext: app.fajrAlarmNext,
       fajrPrayer: app.fajrPrayerNext,
       fajrSource: app.fajrLocationSource,
-      onSetFajr: ({enabled, offsetMinutes, buzzCount, gapSeconds}) async {
+      onSetFajr: ({enabled, offsetMinutes, buzzCount, pauseSteps}) async {
         final onBandNow = await app.setFajrAlarm(
             enabled: enabled,
             offsetMinutes: offsetMinutes,
             buzzCount: buzzCount,
-            gapSeconds: gapSeconds);
+            pauseSteps: pauseSteps);
         if (!onBandNow) throw Exception(notOnBand);
       },
       onRefreshFajr: () async {
@@ -241,6 +241,10 @@ class AlarmScreen extends StatelessWidget {
 /// Fajr alarm copy: a personal addition, English only, so it stays out of
 /// the translated-literal helpers.
 String _fajrText(String s) => s;
+
+/// A pause setting as the strap plays it: steps of 240 ms.
+String _pauseLabel(int steps) =>
+    '${(steps * FajrAlarmSettings.pauseStepMs / 1000).toStringAsFixed(2)} s';
 
 class AlarmScreenView extends StatelessWidget {
   final DateTime? armedAt;
@@ -277,7 +281,7 @@ class AlarmScreenView extends StatelessWidget {
     bool? enabled,
     int? offsetMinutes,
     int? buzzCount,
-    int? gapSeconds,
+    int? pauseSteps,
   })? onSetFajr;
   final Future<void> Function()? onRefreshFajr, onTestFajr;
 
@@ -448,7 +452,7 @@ class AlarmScreenView extends StatelessWidget {
     Future<void> set({bool? on, int? off, int? n, int? gap}) async {
       if (onSetFajr == null) return;
       await onSetFajr!(
-          enabled: on, offsetMinutes: off, buzzCount: n, gapSeconds: gap);
+          enabled: on, offsetMinutes: off, buzzCount: n, pauseSteps: gap);
     }
 
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -482,14 +486,14 @@ class AlarmScreenView extends StatelessWidget {
                   (n) => '$n',
                   (n) => set(n: n))),
           SetRow(LucideIcons.timer, C.purple,
-              _fajrText('Seconds between buzzes'),
-              value: '${f.gapSeconds} s',
+              _fajrText('Pause between buzzes'),
+              value: _pauseLabel(f.pauseSteps),
               chevron: false,
               onTap: () => _pickNumber(
                   c,
-                  _fajrText('Seconds between buzzes'),
-                  [for (var i = 0; i <= FajrAlarmSettings.maxGap; i++) i],
-                  (g) => '$g s',
+                  _fajrText('Pause between buzzes'),
+                  [for (var i = 1; i <= FajrAlarmSettings.maxPause; i++) i],
+                  _pauseLabel,
                   (g) => set(gap: g))),
           SetRow(LucideIcons.mapPin, C.blue, _fajrText('Prayer times for'),
               value: where,

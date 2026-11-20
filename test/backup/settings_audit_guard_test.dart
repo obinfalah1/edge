@@ -23,7 +23,7 @@ const _mustTravel = {
   'activity.nap_auto_log_since_sec',
   // Fajr alarm: the user's on/off and numbers travel; the times are refetched.
   'fajr_alarm_enabled', 'fajr_alarm_offset_min', 'fajr_alarm_buzz_count',
-  'fajr_alarm_gap_sec',
+  'fajr_alarm_pause_steps',
   'coach_api', 'coach_model', 'coach_timeout_seconds',
   'coach_use_chatgpt',
   'ai_morning_enabled', 'ai_morning_min', 'ai_evening_enabled', 'ai_evening_min',

@@ -110,59 +110,53 @@ void main() {
   });
 
   group('settings', () {
-    test('defaults match the shortcut: 15 min, 3 buzzes, 5 s apart', () {
+    test('defaults: 15 min after Fajr, 3 buzzes, longest pause', () {
       const s = FajrAlarmSettings();
-      expect(
-          [s.enabled, s.offsetMinutes, s.buzzCount, s.gapSeconds],
-          [false, 15, 3, 5]);
+      expect([s.enabled, s.offsetMinutes, s.buzzCount, s.pauseSteps],
+          [false, 15, 3, 7]);
     });
 
     test('round-trip through SharedPreferences, clamped to range', () async {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
       await const FajrAlarmSettings()
-          .copyWith(enabled: true, offsetMinutes: 500, buzzCount: 0, gapSeconds: 99)
+          .copyWith(
+              enabled: true, offsetMinutes: 500, buzzCount: 0, pauseSteps: 99)
           .save(prefs);
       final s = FajrAlarmSettings.load(prefs);
-      expect([s.enabled, s.offsetMinutes, s.buzzCount, s.gapSeconds],
-          [true, 120, 1, 8]);
+      expect([s.enabled, s.offsetMinutes, s.buzzCount, s.pauseSteps],
+          [true, 120, 1, 7]);
     });
   });
 
   group('buzz pattern', () {
-    test('is always the 12 bytes the strap expects', () {
-      for (var n = 1; n <= 20; n++) {
-        for (var g = 0; g <= 8; g++) {
-          expect(fajrHapticPattern(buzzCount: n, gapSeconds: g).length, 12);
+    // A WHOOP 5 answered invalid_waveform_effect to other pause values; the
+    // only waveform values it is known to take are the stock alarm's.
+    const accepted = {47, 152, 0};
+
+    test('is 12 bytes and uses only waveform values the band accepts', () {
+      for (var n = 1; n <= FajrAlarmSettings.maxCount; n++) {
+        for (var g = 1; g <= FajrAlarmSettings.maxPause; g++) {
+          final p = fajrHapticPattern(buzzCount: n, pauseSteps: g);
+          expect(p.length, 12);
+          expect(p.sublist(0, 8).every(accepted.contains), isTrue,
+              reason: '$p');
+          expect(p[11], greaterThanOrEqualTo(30), reason: 'stock duration');
         }
       }
     });
 
-    test('3 buzzes 5 s apart: effect 47, 5 s of pauses, loop 3', () {
-      final p = fajrHapticPattern(buzzCount: 3, gapSeconds: 5);
-      expect(p[0], 47);
-      final pauseMs = [
-        for (final b in p.sublist(1, 8))
-          if (b & 0x80 != 0) (b & 0x7f) * 10
-      ].fold<int>(0, (a, b) => a + b);
-      expect(pauseMs, 5000);
+    test('3 buzzes, 7 pause steps: 47 then seven 152s, loop 3', () {
+      final p = fajrHapticPattern(buzzCount: 3, pauseSteps: 7);
+      expect(p.sublist(0, 8), [47, 152, 152, 152, 152, 152, 152, 152]);
       expect(p.sublist(8, 10), [0, 0]);
       expect(p[10], 3, reason: 'overall loop = buzz count');
-      expect(p[11], greaterThanOrEqualTo(3 * 5));
+      expect(p[11], 30);
     });
 
-    test('no gap keeps the stock 240 ms pause', () {
-      expect(fajrHapticPattern(buzzCount: 7, gapSeconds: 0).sublist(0, 2),
-          AlarmPayloads.defaultHaptics.sublist(0, 2));
-    });
-
-    test('the longest gap still fits the seven pause slots', () {
-      final p = fajrHapticPattern(buzzCount: 1, gapSeconds: 8);
-      final pauseMs = [
-        for (final b in p.sublist(1, 8))
-          if (b & 0x80 != 0) (b & 0x7f) * 10
-      ].fold<int>(0, (a, b) => a + b);
-      expect(pauseMs, 8000);
+    test('one pause step is exactly the stock pattern but for the loop', () {
+      final p = fajrHapticPattern(buzzCount: 7, pauseSteps: 1);
+      expect(p, AlarmPayloads.defaultHaptics);
     });
   });
 
@@ -172,7 +166,7 @@ void main() {
     final now = DateTime.utc(2026, 11, 20, 0, 0); // 04:00 Dubai
     final plan = (
       next: nextFajrAlarm(cache, on, now),
-      haptics: fajrHapticPattern(buzzCount: 3, gapSeconds: 5),
+      haptics: fajrHapticPattern(buzzCount: 3, pauseSteps: 7),
     );
     List<AlarmScheduleEntry> weekly({required bool enabled}) => [
           for (var w = 0; w < 7; w++)

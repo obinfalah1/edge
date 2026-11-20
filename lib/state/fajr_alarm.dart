@@ -36,7 +36,7 @@ const int kFajrMethod = 16;
 const String _kEnabled = 'fajr_alarm_enabled';
 const String _kOffset = 'fajr_alarm_offset_min';
 const String _kCount = 'fajr_alarm_buzz_count';
-const String _kGap = 'fajr_alarm_gap_sec';
+const String _kGap = 'fajr_alarm_pause_steps';
 const String _kCache = 'fajr_alarm_cache_v1';
 const String _kCoords = 'fajr_alarm_coords_v1';
 const String _kFetchedAt = 'fajr_alarm_fetched_at_ms';
@@ -52,32 +52,38 @@ class FajrAlarmSettings {
   /// How many buzzes (1..20).
   final int buzzCount;
 
-  /// Seconds between buzzes (0..8). The strap's pattern can hold at most
-  /// about 8.9 s of pause per buzz (seven 1.27 s pause slots).
-  final int gapSeconds;
+  /// Pause between buzzes, in steps of the strap's stock 240 ms pause
+  /// (1..7, i.e. 0.24–1.68 s). The WHOOP 5 only accepts waveform values from
+  /// its own effect table (it answers `invalid_waveform_effect` otherwise —
+  /// seen on hardware for longer DRV2605-style pauses), so the pause is built
+  /// from repeats of the one pause value the stock alarm already uses.
+  final int pauseSteps;
 
   const FajrAlarmSettings({
     this.enabled = false,
     this.offsetMinutes = 15,
     this.buzzCount = 3,
-    this.gapSeconds = 5,
+    this.pauseSteps = 7,
   });
 
   static const int maxOffset = 120;
   static const int maxCount = 20;
-  static const int maxGap = 8;
+  static const int maxPause = 7;
+
+  /// One pause step, as the strap plays it.
+  static const int pauseStepMs = 240;
 
   FajrAlarmSettings copyWith({
     bool? enabled,
     int? offsetMinutes,
     int? buzzCount,
-    int? gapSeconds,
+    int? pauseSteps,
   }) =>
       FajrAlarmSettings(
         enabled: enabled ?? this.enabled,
         offsetMinutes: (offsetMinutes ?? this.offsetMinutes).clamp(0, maxOffset),
         buzzCount: (buzzCount ?? this.buzzCount).clamp(1, maxCount),
-        gapSeconds: (gapSeconds ?? this.gapSeconds).clamp(0, maxGap),
+        pauseSteps: (pauseSteps ?? this.pauseSteps).clamp(1, maxPause),
       );
 
   static FajrAlarmSettings load(SharedPreferences prefs) =>
@@ -85,14 +91,14 @@ class FajrAlarmSettings {
         enabled: prefs.getBool(_kEnabled),
         offsetMinutes: prefs.getInt(_kOffset),
         buzzCount: prefs.getInt(_kCount),
-        gapSeconds: prefs.getInt(_kGap),
+        pauseSteps: prefs.getInt(_kGap),
       );
 
   Future<void> save(SharedPreferences prefs) async {
     await prefs.setBool(_kEnabled, enabled);
     await prefs.setInt(_kOffset, offsetMinutes);
     await prefs.setInt(_kCount, buzzCount);
-    await prefs.setInt(_kGap, gapSeconds);
+    await prefs.setInt(_kGap, pauseSteps);
   }
 
   @override
@@ -101,46 +107,41 @@ class FajrAlarmSettings {
       other.enabled == enabled &&
       other.offsetMinutes == offsetMinutes &&
       other.buzzCount == buzzCount &&
-      other.gapSeconds == gapSeconds;
+      other.pauseSteps == pauseSteps;
 
   @override
   int get hashCode =>
-      Object.hash(enabled, offsetMinutes, buzzCount, gapSeconds);
+      Object.hash(enabled, offsetMinutes, buzzCount, pauseSteps);
 
   @override
   String toString() => 'FajrAlarmSettings(enabled: $enabled, '
-      'offset: ${offsetMinutes}m, buzzes: $buzzCount, gap: ${gapSeconds}s)';
+      'offset: ${offsetMinutes}m, buzzes: $buzzCount, pause steps: $pauseSteps)';
 }
 
-/// The strap's 12-byte alarm haptic pattern for [buzzCount] buzzes,
-/// [gapSeconds] apart.
+/// The strap's 12-byte alarm haptic pattern for [buzzCount] buzzes with
+/// [pauseSteps] × 240 ms of pause after each.
 ///
 /// Layout (see [AlarmPayloads.defaultHaptics]): eight waveform slots, a u16
 /// per-effect loop control, the overall loop count, and the maximum alarm
-/// duration in seconds. The stock pattern is `[47, 152, 0 ×6, 0, 0, 7, 30]`.
+/// duration in seconds. The stock pattern is `[47, 152, 0 ×6, 0, 0, 7, 30]`:
+/// effect 47 (the buzz) then 152 (a 240 ms pause), looped 7 times.
 ///
-/// EXPERIMENTAL: the slot values follow the TI DRV2605 sequencer convention —
-/// a value with the top bit set is a pause of `(value & 0x7F) × 10 ms` (the
-/// stock 152 = 0x98 is a 240 ms pause after effect 47). The gap is built from
-/// such pause slots and the buzz count goes in the overall loop byte. The
-/// stock pattern is only ever verified as a whole; if the band refuses this
-/// one, the caller arms the stock pattern instead, so a wrong guess costs the
-/// custom rhythm, never the alarm.
-List<int> fajrHapticPattern({required int buzzCount, required int gapSeconds}) {
+/// Only those two waveform values are used — a WHOOP 5 refused other pause
+/// values with `invalid_waveform_effect` — so the pause is 152 repeated and
+/// the buzz count is the overall loop. If the band still refuses the pattern
+/// (e.g. the loop count or duration), the caller arms the stock one instead.
+List<int> fajrHapticPattern({required int buzzCount, required int pauseSteps}) {
   final count = buzzCount.clamp(1, FajrAlarmSettings.maxCount);
-  var remainingMs = gapSeconds.clamp(0, FajrAlarmSettings.maxGap) * 1000;
-  final slots = <int>[47];
-  while (remainingMs > 0 && slots.length < 8) {
-    final tens = ((remainingMs + 9) ~/ 10).clamp(1, 0x7F);
-    slots.add(0x80 | tens);
-    remainingMs -= tens * 10;
-  }
-  if (slots.length == 1) slots.add(152); // no gap asked for: stock 240 ms
+  final pauses = pauseSteps.clamp(1, FajrAlarmSettings.maxPause);
+  final slots = <int>[47, for (var i = 0; i < pauses; i++) 152];
   while (slots.length < 8) {
     slots.add(0);
   }
-  // Long enough for every buzz and pause, with headroom; the stock value is 30.
-  final duration = (count * (gapSeconds + 2) + 5).clamp(10, 255);
+  // Enough time for every buzz (≈0.5 s each, generous) and its pauses; never
+  // below the stock 30 s the strap is known to accept.
+  final needed =
+      (count * (500 + pauses * FajrAlarmSettings.pauseStepMs) / 1000).ceil() + 5;
+  final duration = needed < 30 ? 30 : (needed > 255 ? 255 : needed);
   return <int>[...slots, 0, 0, count, duration];
 }
 
@@ -332,7 +333,7 @@ FajrPlan loadFajrPlan(SharedPreferences prefs, DateTime now) {
   final s = FajrAlarmSettings.load(prefs);
   return (
     next: nextFajrAlarm(FajrTimes.readCache(prefs), s, now),
-    haptics: fajrHapticPattern(buzzCount: s.buzzCount, gapSeconds: s.gapSeconds),
+    haptics: fajrHapticPattern(buzzCount: s.buzzCount, pauseSteps: s.pauseSteps),
   );
 }
 
