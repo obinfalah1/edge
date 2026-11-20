@@ -41,6 +41,7 @@ const String _kCache = 'fajr_alarm_cache_v1';
 const String _kCoords = 'fajr_alarm_coords_v1';
 const String _kFetchedAt = 'fajr_alarm_fetched_at_ms';
 const String _kSource = 'fajr_alarm_coords_source';
+const String _kBuzzTimer = 'buzz_timer_epoch';
 
 /// The user's numbers — the same three the shortcut had.
 class FajrAlarmSettings {
@@ -78,13 +79,12 @@ class FajrAlarmSettings {
     int? offsetMinutes,
     int? buzzCount,
     int? pauseSteps,
-  }) =>
-      FajrAlarmSettings(
-        enabled: enabled ?? this.enabled,
-        offsetMinutes: (offsetMinutes ?? this.offsetMinutes).clamp(0, maxOffset),
-        buzzCount: (buzzCount ?? this.buzzCount).clamp(1, maxCount),
-        pauseSteps: (pauseSteps ?? this.pauseSteps).clamp(1, maxPause),
-      );
+  }) => FajrAlarmSettings(
+    enabled: enabled ?? this.enabled,
+    offsetMinutes: (offsetMinutes ?? this.offsetMinutes).clamp(0, maxOffset),
+    buzzCount: (buzzCount ?? this.buzzCount).clamp(1, maxCount),
+    pauseSteps: (pauseSteps ?? this.pauseSteps).clamp(1, maxPause),
+  );
 
   static FajrAlarmSettings load(SharedPreferences prefs) =>
       const FajrAlarmSettings().copyWith(
@@ -114,7 +114,8 @@ class FajrAlarmSettings {
       Object.hash(enabled, offsetMinutes, buzzCount, pauseSteps);
 
   @override
-  String toString() => 'FajrAlarmSettings(enabled: $enabled, '
+  String toString() =>
+      'FajrAlarmSettings(enabled: $enabled, '
       'offset: ${offsetMinutes}m, buzzes: $buzzCount, pause steps: $pauseSteps)';
 }
 
@@ -140,7 +141,8 @@ List<int> fajrHapticPattern({required int buzzCount, required int pauseSteps}) {
   // Enough time for every buzz (≈0.5 s each, generous) and its pauses; never
   // below the stock 30 s the strap is known to accept.
   final needed =
-      (count * (500 + pauses * FajrAlarmSettings.pauseStepMs) / 1000).ceil() + 5;
+      (count * (500 + pauses * FajrAlarmSettings.pauseStepMs) / 1000).ceil() +
+      5;
   final duration = needed < 30 ? 30 : (needed > 255 ? 255 : needed);
   return <int>[...slots, 0, 0, count, duration];
 }
@@ -180,11 +182,16 @@ class FajrTimes {
 
   /// True when the cache is missing any of the next [aheadDays] days or is
   /// older than a week (a moved phone, or a corrected API, gets picked up).
-  static bool needsRefresh(SharedPreferences prefs, DateTime now,
-      {int aheadDays = 10}) {
+  static bool needsRefresh(
+    SharedPreferences prefs,
+    DateTime now, {
+    int aheadDays = 10,
+  }) {
     final cache = readCache(prefs);
     for (var i = 0; i <= aheadDays; i++) {
-      if (!cache.containsKey(dayKey(DateTime(now.year, now.month, now.day + i)))) {
+      if (!cache.containsKey(
+        dayKey(DateTime(now.year, now.month, now.day + i)),
+      )) {
         return true;
       }
     }
@@ -197,8 +204,10 @@ class FajrTimes {
   /// (the user just switched the Fajr alarm on) — and remembers it; otherwise
   /// it reuses the last stored fix, else Sharjah.
   static Future<({double lat, double lon, String source})> _coordinates(
-      SharedPreferences prefs,
-      {required bool useGps, bool askPermission = false}) async {
+    SharedPreferences prefs, {
+    required bool useGps,
+    bool askPermission = false,
+  }) async {
     if (useGps) {
       try {
         if (await Geolocator.isLocationServiceEnabled()) {
@@ -208,7 +217,8 @@ class FajrTimes {
           }
           if (perm == LocationPermission.whileInUse ||
               perm == LocationPermission.always) {
-            final pos = await Geolocator.getLastKnownPosition() ??
+            final pos =
+                await Geolocator.getLastKnownPosition() ??
                 await Geolocator.getCurrentPosition(
                   locationSettings: const LocationSettings(
                     accuracy: LocationAccuracy.low,
@@ -227,7 +237,8 @@ class FajrTimes {
     if (stored != null && stored.length == 2 && prevSource != 'sharjah') {
       final lat = double.tryParse(stored[0]);
       final lon = double.tryParse(stored[1]);
-      if (lat != null && lon != null) return (lat: lat, lon: lon, source: 'last');
+      if (lat != null && lon != null)
+        return (lat: lat, lon: lon, source: 'last');
     }
     return (lat: kFajrFallbackLat, lon: kFajrFallbackLon, source: 'sharjah');
   }
@@ -243,8 +254,11 @@ class FajrTimes {
     Duration timeout = const Duration(seconds: 12),
   }) async {
     final at = now ?? DateTime.now();
-    final c = await _coordinates(prefs,
-        useGps: useGps, askPermission: askPermission);
+    final c = await _coordinates(
+      prefs,
+      useGps: useGps,
+      askPermission: askPermission,
+    );
     final http.Client cl = client ?? http.Client();
     final fresh = <String, int>{};
     try {
@@ -252,13 +266,16 @@ class FajrTimes {
         DateTime(at.year, at.month),
         DateTime(at.year, at.month + 1),
       ]) {
-        final uri = Uri.https('api.aladhan.com',
-            '/v1/calendar/${month.year}/${month.month}', {
-          'latitude': c.lat.toStringAsFixed(4),
-          'longitude': c.lon.toStringAsFixed(4),
-          'method': '$kFajrMethod',
-          'iso8601': 'true',
-        });
+        final uri = Uri.https(
+          'api.aladhan.com',
+          '/v1/calendar/${month.year}/${month.month}',
+          {
+            'latitude': c.lat.toStringAsFixed(4),
+            'longitude': c.lon.toStringAsFixed(4),
+            'method': '$kFajrMethod',
+            'iso8601': 'true',
+          },
+        );
         try {
           final res = await cl.get(uri).timeout(timeout);
           if (res.statusCode != 200) continue;
@@ -279,7 +296,9 @@ class FajrTimes {
     await prefs.setString(_kCache, jsonEncode(merged));
     await prefs.setInt(_kFetchedAt, at.millisecondsSinceEpoch);
     await prefs.setString(
-        _kCoords, '${c.lat.toStringAsFixed(4)},${c.lon.toStringAsFixed(4)}');
+      _kCoords,
+      '${c.lat.toStringAsFixed(4)},${c.lon.toStringAsFixed(4)}',
+    );
     await prefs.setString(_kSource, c.source);
     return true;
   }
@@ -317,8 +336,9 @@ DateTime? nextFajrAlarm(
   if (!settings.enabled) return null;
   DateTime? best;
   for (final sec in cache.values) {
-    final at = DateTime.fromMillisecondsSinceEpoch(sec * 1000)
-        .add(Duration(minutes: settings.offsetMinutes));
+    final at = DateTime.fromMillisecondsSinceEpoch(
+      sec * 1000,
+    ).add(Duration(minutes: settings.offsetMinutes));
     if (!at.isAfter(now)) continue;
     if (best == null || at.isBefore(best)) best = at;
   }
@@ -328,12 +348,59 @@ DateTime? nextFajrAlarm(
 /// Everything the arming code needs about the Fajr alarm right now.
 typedef FajrPlan = ({DateTime? next, List<int> haptics});
 
-/// Read settings + cache and compute the plan. No network.
+/// A one-off "buzz in N minutes" timer, set from Siri / Shortcuts
+/// (BuzzTimerIntent in ios/OpenStrapIntents.swift). It shares the strap's one
+/// alarm slot with the weekly schedule and Fajr: whichever comes first is
+/// armed, and once the timer has fired the usual re-arm moves on to the next
+/// one, so Fajr comes back by itself.
+class BuzzTimer {
+  static const int maxMinutes = 720;
+
+  /// The pending timer, or null when none is set or it has already passed.
+  static DateTime? pending(SharedPreferences prefs, DateTime now) {
+    final sec = prefs.getInt(_kBuzzTimer);
+    if (sec == null) return null;
+    final at = DateTime.fromMillisecondsSinceEpoch(sec * 1000);
+    return at.isAfter(now) ? at : null;
+  }
+
+  /// Sets the timer [minutes] from [now] (whole seconds, which is what the
+  /// strap stores) and returns when it goes off.
+  static Future<DateTime> start(
+    SharedPreferences prefs,
+    int minutes, {
+    DateTime? now,
+  }) async {
+    final from = now ?? DateTime.now();
+    final sec =
+        from.millisecondsSinceEpoch ~/ 1000 + minutes.clamp(1, maxMinutes) * 60;
+    await prefs.setInt(_kBuzzTimer, sec);
+    return DateTime.fromMillisecondsSinceEpoch(sec * 1000);
+  }
+
+  /// The timer's unix second as stored, past or not (null when none).
+  static int? storedEpoch(SharedPreferences prefs) => prefs.getInt(_kBuzzTimer);
+
+  static Future<void> cancel(SharedPreferences prefs) =>
+      prefs.remove(_kBuzzTimer);
+}
+
+/// Read settings + cache and compute the plan: the next Fajr + offset or a
+/// pending buzz timer, whichever is first. Both buzz with the Fajr pattern.
+/// No network.
 FajrPlan loadFajrPlan(SharedPreferences prefs, DateTime now) {
   final s = FajrAlarmSettings.load(prefs);
+  final fajr = nextFajrAlarm(FajrTimes.readCache(prefs), s, now);
+  final timer = BuzzTimer.pending(prefs, now);
+  final next = timer != null && (fajr == null || timer.isBefore(fajr))
+      ? timer
+      : fajr;
   return (
-    next: nextFajrAlarm(FajrTimes.readCache(prefs), s, now),
-    haptics: fajrHapticPattern(buzzCount: s.buzzCount, pauseSteps: s.pauseSteps),
+    next: next,
+    haptics: fajrHapticPattern(
+      buzzCount: s.buzzCount,
+      pauseSteps: s.pauseSteps,
+    ),
   );
 }
 

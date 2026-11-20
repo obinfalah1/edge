@@ -281,6 +281,85 @@ struct BuzzBandIntent: AppIntent {
   }
 }
 
+/// "Set a 20 minute buzz timer in Edge": the band buzzes once N minutes are
+/// up. It is armed as the band's OWN alarm (the same slot the Fajr and weekly
+/// alarms use, with the Fajr buzz count and pause), so it goes off with the
+/// phone locked and Edge closed. When Fajr or the weekly alarm comes first
+/// the timer waits its turn; after it fires, Edge re-arms the next alarm.
+@available(iOS 16.0, *)
+struct BuzzTimerIntent: AppIntent {
+  static var title: LocalizedStringResource = "Buzz Timer"
+  static var description = IntentDescription(
+    "Make your band buzz after a number of minutes, like a timer. Works with the phone locked; the band keeps the time itself.")
+  static var openAppWhenRun = false
+  static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
+
+  @Parameter(title: "Minutes", description: "How long until the band buzzes.",
+             inclusiveRange: (1, 720),
+             requestValueDialog: IntentDialog("How many minutes?"))
+  var minutes: Int
+
+  static var parameterSummary: some ParameterSummary {
+    Summary("Buzz the band in \(\.$minutes) minutes")
+  }
+
+  @MainActor
+  func perform() async throws -> some IntentResult & ReturnsValue<String> & ProvidesDialog {
+    let n = min(max(minutes, 1), 720)
+    let text = await BuzzTimerRunner.set(minutes: n)
+    return .result(value: text, dialog: IntentDialog(stringLiteral: text))
+  }
+}
+
+/// Clears a pending buzz timer and puts the next real alarm back on the band.
+@available(iOS 16.0, *)
+struct CancelBuzzTimerIntent: AppIntent {
+  static var title: LocalizedStringResource = "Cancel Buzz Timer"
+  static var description = IntentDescription("Cancel the band buzz timer.")
+  static var openAppWhenRun = false
+  static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
+
+  @MainActor
+  func perform() async throws -> some IntentResult & ReturnsValue<String> & ProvidesDialog {
+    let text = await BuzzTimerRunner.set(minutes: 0)
+    return .result(value: text, dialog: IntentDialog(stringLiteral: text))
+  }
+}
+
+@available(iOS 16.0, *)
+@MainActor
+enum BuzzTimerRunner {
+  /// minutes > 0 sets the timer, 0 cancels it. Returns what Siri says.
+  static func set(minutes: Int) async -> String {
+    let bridge = ShortcutSyncBridge.shared
+    guard let reply = await bridge.call("buzzTimer", ["minutes": minutes], timeout: 15) as? [String: Any],
+          let status = reply["status"] as? String else {
+      return "Edge did not answer. Open Edge and try again."
+    }
+    let at = Date(timeIntervalSince1970: TimeInterval(reply["at"] as? Int ?? 0))
+    if status == "needsSync" {
+      // Not connected right now: one sync connects, and connecting arms the
+      // band from the same plan.
+      _ = try? await bridge.sync(timeout: 25)
+    }
+    let state = await bridge.call("buzzTimerStatus", nil, timeout: 5) as? String
+    if minutes == 0 {
+      return state == "timer" || status == "failed"
+        ? "Timer cancelled in Edge, but the band could not be reached yet. Open Edge to update it."
+        : "Buzz timer cancelled."
+    }
+    let time = at.formatted(date: .omitted, time: .shortened)
+    switch state {
+    case "timer":
+      return "Done. Your band will buzz at \(time), in \(minutes) minutes."
+    case "other" where status != "failed":
+      return "Timer saved for \(time), but an earlier alarm holds the band, so the timer waits until that one has gone off."
+    default:
+      return "Timer saved for \(time), but the band could not be reached. Keep Edge connected or open it so the band gets it."
+    }
+  }
+}
+
 /// Flutter consumes the breathing route on launch and resume because opening
 /// the app does not guarantee a fresh process.
 @available(iOS 16.0, *)
@@ -390,6 +469,26 @@ struct OpenStrapShortcuts: AppShortcutsProvider {
       ],
       shortTitle: "Tomorrow's Alarm",
       systemImageName: "alarm")
+
+    AppShortcut(
+      intent: BuzzTimerIntent(),
+      phrases: [
+        "Set a buzz timer in \(.applicationName)",
+        "\(.applicationName) buzz timer",
+        "Start a band timer with \(.applicationName)",
+        "Buzz my band later with \(.applicationName)",
+      ],
+      shortTitle: "Buzz Timer",
+      systemImageName: "timer")
+
+    AppShortcut(
+      intent: CancelBuzzTimerIntent(),
+      phrases: [
+        "Cancel the buzz timer in \(.applicationName)",
+        "\(.applicationName) cancel buzz timer",
+      ],
+      shortTitle: "Cancel Buzz Timer",
+      systemImageName: "timer.slash")
 
     AppShortcut(
       intent: BuzzBandIntent(),

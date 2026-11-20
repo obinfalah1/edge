@@ -11,6 +11,8 @@ import '../ble/ble_state.dart';
 import '../compute/derivation_engine.dart';
 import '../data/db.dart';
 import '../data/local_repository_impl.dart';
+import '../state/alarm_schedule.dart' show persistedAlarmEpoch;
+import '../state/fajr_alarm.dart' show BuzzTimer;
 import '../state/prefs.dart';
 import '../widget/widget_service.dart';
 import 'background_sync.dart';
@@ -68,6 +70,10 @@ class IosShortcutSync {
           return null;
         case 'buzz':
           return buzz();
+        case 'buzzTimer':
+          return buzzTimer((args['minutes'] as int?) ?? 0);
+        case 'buzzTimerStatus':
+          return buzzTimerStatus();
         default:
           throw MissingPluginException();
       }
@@ -91,6 +97,49 @@ class IosShortcutSync {
       debugPrint('[shortcut-sync] buzz: $e');
       return 'failed';
     }
+  }
+
+  /// AppState's forced re-arm over its live link; set while the app runs.
+  static Future<bool> Function()? foregroundRearm;
+
+  /// Sets (minutes > 0) or cancels (0) the buzz timer, then puts it on the
+  /// band right away when the app already holds a live link. Otherwise the
+  /// native side runs a sync, whose connect re-arms from the same plan.
+  /// Replies with the timer's unix second (0 when cancelled) and 'armed',
+  /// 'failed' or 'needsSync'.
+  static Future<Map<String, Object>> buzzTimer(int minutes) async {
+    final prefs = await SharedPreferences.getInstance();
+    var at = 0;
+    if (minutes > 0) {
+      at =
+          (await BuzzTimer.start(prefs, minutes)).millisecondsSinceEpoch ~/
+          1000;
+    } else {
+      await BuzzTimer.cancel(prefs);
+    }
+    final engine = foregroundEngine?.call();
+    final rearm = foregroundRearm;
+    if (rearm == null || engine == null || !engine.isConnected) {
+      return {'at': at, 'status': 'needsSync'};
+    }
+    try {
+      return {'at': at, 'status': await rearm() ? 'armed' : 'failed'};
+    } catch (e) {
+      debugPrint('[shortcut-sync] buzz timer: $e');
+      return {'at': at, 'status': 'failed'};
+    }
+  }
+
+  /// What the band holds now: 'timer' when the armed alarm is the pending
+  /// buzz timer, 'other' when something earlier (Fajr, the weekly alarm) has
+  /// the slot, 'none' when nothing confirmed is armed.
+  static Future<String> buzzTimerStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload();
+    final paired = await PairedDevice.load();
+    final armed = persistedAlarmEpoch(prefs, paired?.remoteId);
+    if (armed == null) return 'none';
+    return armed == BuzzTimer.storedEpoch(prefs) ? 'timer' : 'other';
   }
 
   static Future<ShortcutSyncResult> run(String id, Duration budget) async {
@@ -337,7 +386,9 @@ class IosShortcutSync {
   }
 
   static Future<ShortcutSyncResult> _derive(
-      ShortcutSyncTask task, int resetGen) async {
+    ShortcutSyncTask task,
+    int resetGen,
+  ) async {
     if (task.stopped) return task.expired;
     task.update('processing');
     final profile = await loadHeadlessProfile();

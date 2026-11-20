@@ -2086,6 +2086,8 @@ class AppState extends ChangeNotifier {
     // skip the headless BLE path (it would fight FBP for the peripheral) — route
     // them to a catch-up pull over the existing live connection instead.
     IosBgTask.foregroundPull = foregroundCatchUp;
+    IosShortcutSync.foregroundRearm =
+        () => _armNextAlarmOccurrence(force: true);
     IosShortcutSync.attachForeground(syncForShortcut, () => engine);
     taskerBridge; // force init: register the method channel handler
     // A paired sensor's live beats, into the same trace as the band's. Touches
@@ -5400,7 +5402,9 @@ class AppState extends ChangeNotifier {
 
   void _readFajrState(SharedPreferences prefs) {
     _fajr = FajrAlarmSettings.load(prefs);
-    _fajrNext = loadFajrPlan(prefs, DateTime.now()).next;
+    // Fajr only: the plan's `next` can be a buzz timer.
+    _fajrNext =
+        nextFajrAlarm(FajrTimes.readCache(prefs), _fajr, DateTime.now());
     _fajrSource = FajrTimes.coordsSource(prefs);
     _fajrFetchedAt = FajrTimes.lastFetched(prefs);
   }

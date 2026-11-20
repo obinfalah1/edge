@@ -179,6 +179,37 @@ final class ShortcutSyncBridge {
     }
   }
 
+  /// One plain method call into Dart, waiting for the Dart side to come up
+  /// (a Siri launch may be starting the app) and giving up at [timeout].
+  /// Nil when Dart never answered.
+  func call(_ method: String, _ arguments: Any? = nil,
+            timeout: TimeInterval = 10) async -> Any? {
+    let deadline = ProcessInfo.processInfo.systemUptime + timeout
+    while !ready || send == nil {
+      let left = deadline - ProcessInfo.processInfo.systemUptime
+      guard left > 0, !Task.isCancelled else { return nil }
+      try? await Task.sleep(nanoseconds: UInt64(min(0.1, left) * 1_000_000_000))
+    }
+    guard let send else { return nil }
+    let left = max(0, deadline - ProcessInfo.processInfo.systemUptime)
+    final class Once { var c: CheckedContinuation<Any?, Never>?
+      func finish(_ v: Any?) { c?.resume(returning: v); c = nil } }
+    let once = Once()
+    return await withCheckedContinuation { continuation in
+      once.c = continuation
+      let watchdog = Task { @MainActor in
+        try? await Task.sleep(nanoseconds: UInt64(left * 1_000_000_000))
+        once.finish(nil)
+      }
+      send(method, arguments) { reply in
+        MainActor.assumeIsolated {
+          watchdog.cancel()
+          once.finish(reply is FlutterError ? nil : reply)
+        }
+      }
+    }
+  }
+
   func cancel(id: String, code: String = "cancelled") {
     guard let request = pending, request.id == id else { return }
     if request.sent { send?("cancel", ["id": id], { _ in }) }

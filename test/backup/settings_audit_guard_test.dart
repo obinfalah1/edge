@@ -78,7 +78,7 @@ const _mustStay = {
   'alarm_pending_until', 'alarm_latch_alert', 'alarm_probe_pending', 'alarm_fired_at',
   'smart_wake_fired_epoch',
   'fajr_alarm_cache_v1', 'fajr_alarm_fetched_at_ms', 'fajr_alarm_coords_v1',
-  'fajr_alarm_coords_source',
+  'fajr_alarm_coords_source', 'buzz_timer_epoch',
   'live.session_draft', 'live_session_checkpoint', 'telemetry_outbox',
   // Permission and grant are per install.
   'health_weight_perm_asked', 'health_weight_grant_seen',
