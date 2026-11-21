@@ -30,6 +30,7 @@ import 'package:flutter/cupertino.dart' show NoDefaultCupertinoThemeData;
 import 'package:flutter/material.dart';
 
 import 'moving_backdrop.dart';
+import 'skeleton/guide_plot.dart' show GuideDecoration;
 
 /// ── COLOUR ────────────────────────────────────────────────────────────────
 ///
@@ -579,7 +580,7 @@ BoxDecoration glassDecoration(P p,
     );
 
 /// The glass rim: bright along the top edge, fading down the sides.
-class GlassRim extends CustomPainter {
+class GlassRim extends CustomPainter implements GuideDecoration {
   final bool dark;
   final BorderRadius radius;
   const GlassRim(this.dark, {this.radius = R.rLg});

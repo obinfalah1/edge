@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import 'theme.dart';
+import 'skeleton/guide_plot.dart' show GuideDecoration;
 
 class MovingBackdrop extends StatefulWidget {
   final Widget child;
@@ -62,7 +63,7 @@ class _MovingBackdropState extends State<MovingBackdrop>
 }
 
 /// Four deep colour fields on slow, unrelated orbits over black.
-class _Fields extends CustomPainter {
+class _Fields extends CustomPainter implements GuideDecoration {
   final ValueNotifier<double> t;
   _Fields(this.t) : super(repaint: t);
 

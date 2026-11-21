@@ -915,7 +915,11 @@ class RingTrio extends StatelessWidget {
   /// worth pushing onto.
   final void Function(HomeRingKind)? onOpen;
 
-  const RingTrio({super.key, required this.d, this.onOpen});
+  /// Drawn at the top inside the card: the day being shown (Home puts the day
+  /// label here, and the card swipes between days).
+  final Widget? header;
+
+  const RingTrio({super.key, required this.d, this.onOpen, this.header});
 
   /// Whether ANY of the three has something to draw. When none do, the screen
   /// owes the user one written absence, not three empty circles.
@@ -979,6 +983,7 @@ class RingTrio extends StatelessWidget {
     return Surface(
       elevation: 2,
       child: Column(children: [
+        if (header != null) ...[header!, const SizedBox(height: S.x3)],
         // Rows replace columns by locale, text scale and width only, never by
         // the day's data: an empty card and a loaded one are the same layout.
         if (bigText(c))
@@ -2255,6 +2260,45 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
 
   /// Another day. The switcher never strands you off the record — [DayNav]
   /// already restricts the arrows to [_days] — so this just re-loads for it.
+  /// The day shown, inside the rings card: tap to pick a day; the faint
+  /// chevrons say the card swipes, and step a day when tapped too.
+  Widget _dayHeader(BuildContext c, HomeData d) {
+    final p = P.of(c);
+    final l = AppLocalizations.of(c);
+    final day = _day ?? d.dayId;
+    final older = _neighbourDay(older: true);
+    final newer = _neighbourDay(older: false);
+    Widget chevron(IconData icon, String label, String? to) => Opacity(
+          opacity: to == null ? .2 : .55,
+          child: Pressable(
+            onTap: to == null ? null : () => _goDay(to),
+            semanticLabel: label,
+            child: Icon(icon, size: 18, color: p.ink3),
+          ),
+        );
+    return Row(children: [
+      chevron(LucideIcons.chevronLeft,
+          l?.metricDetailPreviousDay ?? 'Previous day', older),
+      Expanded(
+        child: Pressable(
+          onTap: () async {
+            final picked = await chooseDay(c, _days, day);
+            if (picked != null && picked != day) _goDay(picked);
+          },
+          semanticLabel: l?.metricDetailChooseDayShowing(dayNavLabel(day, l)) ??
+              'Choose a day. Showing ${dayNavLabel(day, l)}',
+          child: Text(dayNavLabel(day, l),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: F.head.copyWith(color: p.ink)),
+        ),
+      ),
+      chevron(LucideIcons.chevronRight, l?.metricDetailNextDay ?? 'Next day',
+          newer),
+    ]);
+  }
+
   /// The day before (older) or after the one shown, from the same list and
   /// in the same order as the day switcher's arrows (newest first).
   String? _neighbourDay({required bool older}) {
@@ -2566,7 +2610,9 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
       if (bare) ...[
         const DetectedActivitiesCard(),
       ],
-      ...dayNavRow(_day ?? d.dayId, _days, _goDay),
+      // The day lives inside the rings card, which swipes between days; the
+      // separate bar is only for a day with no rings to carry it.
+      if (!RingTrio.has(d)) ...dayNavRow(_day ?? d.dayId, _days, _goDay),
       // Stepped back through the record: one tap home.
       if (!isToday)
         Align(
@@ -2631,6 +2677,7 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
             newerLabel: l?.metricDetailNextDay ?? 'Next day',
             child: RingTrio(
             d: d,
+            header: _days.length < 2 ? null : _dayHeader(c, d),
             onOpen: (k) => go(
                 c,
                 switch (k) {
