@@ -35,6 +35,8 @@ import 'home_screen.dart';
 import 'investigate.dart';
 import 'metric_detail.dart';
 import 'wellness_screen.dart';
+import 'healthspan_screen.dart';
+import '../../l10n/personal_text.dart';
 
 /// A read this screen can live without. The wear block and the nap block are
 /// ADDITIONS to the repository interface, so an implementation written before
@@ -1287,6 +1289,14 @@ class _HealthScreenState extends State<HealthScreen> with RevisionReload {
         const SizedBox(height: S.x3),
         Surface(child: _hrvPreview(c, d)),
       ],
+
+      const SizedBox(height: S.x3),
+      detailLinkRow(
+          c,
+          LucideIcons.hourglass,
+          tr(c, 'Healthspan', 'مدى الصحة'),
+          tr(c, 'An estimated age from six habits, and what moves it', 'عمر تقديري من ست عادات، وما الذي يحرّكه'),
+          () => go(c, const HealthspanScreen())),
 
       // The research charts, all behind one door.
       const SizedBox(height: S.x3),

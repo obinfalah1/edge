@@ -37,6 +37,7 @@ import '../../state/app_state.dart';
 import '../ui2.dart';
 import 'ai_briefing.dart';
 import 'coach_figures.dart';
+import '../../l10n/personal_text.dart';
 import 'home_screen.dart' show go, pad, repoOf;
 import 'journal_compose.dart' show OsTextField;
 
@@ -1404,9 +1405,9 @@ class _CoachSetupState extends State<CoachSetup> {
           Expanded(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(uiText(c, 'Apple Intelligence on this iPhone'),
+              Text(tr(c, 'Apple Intelligence on this iPhone', 'Apple Intelligence على هذا الآيفون'),
                   style: F.head.copyWith(color: p.ink)),
-              Text(uiText(c, 'Free, offline, private. No key needed.'),
+              Text(tr(c, 'Free, offline, private. No key needed.', 'مجاني وبلا إنترنت وخاص. لا يحتاج إلى مفتاح.'),
                   style: F.cap.copyWith(color: p.ink2)),
             ]),
           ),
@@ -1414,7 +1415,7 @@ class _CoachSetupState extends State<CoachSetup> {
             value: _apple,
             onChanged: (on) async {
               if (on && st != null && !ready) {
-                setState(() => _msg = st.message);
+                setState(() => _msg = st.text(isArabic(context)));
                 return;
               }
               await context.read<CoachConfig>().save(useApple: on);
@@ -1425,14 +1426,13 @@ class _CoachSetupState extends State<CoachSetup> {
         const SizedBox(height: S.x3),
         Text(
             st == null
-                ? uiText(c, 'Checking Apple Intelligence…')
-                : uiText(c, st.message),
+                ? tr(c, 'Checking Apple Intelligence…', 'جارٍ التحقق من Apple Intelligence…')
+                : st.text(isArabic(c)),
             style: F.cap.copyWith(color: ready ? p.on(C.green) : p.ink3)),
         if (_apple) ...[
           const SizedBox(height: S.x2),
           Text(
-              uiText(c,
-                  'The coach, briefings and journal now use Apple’s small on-device model. It answers from your last two weeks and can’t log things for you; switch it off to use a bigger model instead.'),
+              tr(c, 'The coach, briefings and journal now use Apple’s small on-device model. It answers from your last two weeks and can’t log things for you; switch it off to use a bigger model instead.', 'يستخدم المدرب والملخصات واليوميات الآن نموذج Apple الصغير على الجهاز. يجيب من بيانات آخر أسبوعين ولا يستطيع التسجيل نيابةً عنك؛ أوقفه لاستخدام نموذج أكبر.'),
               style: F.cap.copyWith(color: p.ink3)),
         ],
         if (_apple && _msg != null) ...[

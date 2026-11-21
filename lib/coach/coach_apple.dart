@@ -32,6 +32,17 @@ enum AppleAiStatus {
         _ => unsupported,
       };
 
+  /// What the settings screen says about it, in Arabic when [arabic].
+  String text(bool arabic) => arabic ? _ar : message;
+
+  String get _ar => switch (this) {
+        available => 'جاهز. يعمل على هذا الآيفون ولا يغادره شيء.',
+        notEnabled => 'فعّل Apple Intelligence من الإعدادات لاستخدام النموذج على الجهاز.',
+        notReady => 'نموذج Apple على الجهاز ما زال يُنزَّل. حاول لاحقًا.',
+        deviceNotEligible => 'هذا الآيفون لا يدعم نموذج Apple على الجهاز.',
+        unsupported => 'يحتاج آيفون يدعم Apple Intelligence بنظام iOS 26 أو أحدث.',
+      };
+
   /// What the settings screen says about it.
   String get message => switch (this) {
         available => 'Ready. Runs on this iPhone; nothing leaves it.',
