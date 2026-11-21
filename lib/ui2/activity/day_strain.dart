@@ -308,7 +308,7 @@ class _DayStrainDetailState extends State<DayStrainDetail> {
         // the new day's name.
         if (_loading) ...[
           const SizedBox(height: S.x8),
-          const Center(child: CircularProgressIndicator()),
+          const Center(child: CircularProgressIndicator.adaptive()),
         ] else ...[
           ..._trace(p, l, d),
           ..._zones(p, l, d),

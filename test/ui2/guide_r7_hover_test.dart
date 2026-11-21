@@ -19,7 +19,8 @@ void main() { testWidgets('R7 hover follows the target through translation and s
     final before = await pixels([const Offset(100, 80), const Offset(5, 5)]);
     // A large target's centre must receive only the reference's 26% tint. Outer-fill blur can take a rectangular fast path and add 55% in its
     // middle, leaving a conspicuous lighter patch. Use independent RGB math.
-    final expected = [ (.74 * 71 + .26 * 59).round(), (.74 * 85 + .26 * 130).round(), (.74 * 105 + .26 * 246).round(), ];
+    int ch(Color c, int shift) => c.toARGB32() >> shift & 255; // the tokens, not hard-coded RGB
+    final expected = [ for (final sh in const [16, 8, 0]) (.74 * ch(C.n600, sh) + .26 * ch(C.blue, sh)).round(), ];
     final actual = [before[0] >> 24 & 255, before[0] >> 16 & 255, before[0] >> 8 & 255]; for (var i = 0; i < 3; i++) {
       expect(actual[i], closeTo(expected[i], 2), reason: 'uniform tint, without an inner glow rectangle'); }
     expect(before[0], isNot(before[1]), reason: 'positive control: hover is visible');

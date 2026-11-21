@@ -26,6 +26,7 @@
 //      dark-mode branch.
 
 import 'dart:math' as math;
+import 'package:flutter/cupertino.dart' show NoDefaultCupertinoThemeData;
 import 'package:flutter/material.dart';
 
 /// ── COLOUR ────────────────────────────────────────────────────────────────
@@ -35,18 +36,18 @@ import 'package:flutter/material.dart';
 /// [P.fill] (accent as a filled surface under [P.inkOnFill]) first.
 class C {
   // primary
-  static const green = Color(0xFF22C55E);
-  static const greenD = Color(0xFF16A34A);
-  static const blue = Color(0xFF3B82F6);
-  static const purple = Color(0xFF8B5CF6);
+  static const green = Color(0xFF34C759);
+  static const greenD = Color(0xFF248A3D);
+  static const blue = Color(0xFF007AFF);
+  static const purple = Color(0xFFAF52DE);
 
   // secondary
-  static const orange = Color(0xFFF97316);
-  static const red = Color(0xFFEF4444);
-  static const teal = Color(0xFF14B8A6);
-  static const yellow = Color(0xFFEAB308);
-  static const pink = Color(0xFFEC4899);
-  static const indigo = Color(0xFF6366F1);
+  static const orange = Color(0xFFFF9500);
+  static const red = Color(0xFFFF3B30);
+  static const teal = Color(0xFF30B0C7);
+  static const yellow = Color(0xFFFFCC00);
+  static const pink = Color(0xFFFF2D55);
+  static const indigo = Color(0xFF5856D6);
 
   /// Two light blues the ramps need and nothing else does: the light-sleep
   /// lane sits between REM and deep, and zone 1 sits below `blue`. They live
@@ -135,24 +136,24 @@ class P {
 
   static P of(BuildContext c) => P(Theme.of(c).brightness == Brightness.dark);
 
-  Color get bg => dark ? const Color(0xFF0B1017) : C.n50;
-  Color get card => dark ? const Color(0xFF151C26) : C.white;
-  Color get card2 => dark ? const Color(0xFF1D2632) : C.n100;
-  Color get line => dark ? const Color(0xFF232D3B) : C.n200;
-  Color get track => dark ? const Color(0xFF232D3B) : C.n200;
+  Color get bg => dark ? const Color(0xFF000000) : const Color(0xFFF2F2F7);
+  Color get card => dark ? const Color(0xFF1C1C1E) : C.white;
+  Color get card2 => dark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7);
+  Color get line => dark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA);
+  Color get track => dark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA);
 
   /// The colour an elevated surface casts. Black in the dark theme: a navy
   /// shadow is lighter than the dark page and reads as a glow, not a shadow.
   Color get shadow => dark ? const Color(0xFF000000) : C.n900;
 
-  Color get ink => dark ? const Color(0xFFF1F5F9) : C.n900;
-  Color get ink2 => dark ? const Color(0xFF94A3B8) : C.n600;
+  Color get ink => dark ? const Color(0xFFFFFFFF) : const Color(0xFF000000);
+  Color get ink2 => dark ? const Color(0xFFAEAEB2) : const Color(0xFF3C3C43);
 
   /// The muted caption ink. Hand-solved to clear 4.5:1 on [card2], the darkest
   /// (light theme) / lightest (dark theme) surface it can sit on — so it is
   /// legible on every surface, not just the one it was eyeballed against.
   /// The values it replaces measured 4.34:1 and 3.21:1 respectively.
-  Color get ink3 => dark ? const Color(0xFF7F8DA0) : const Color(0xFF627188);
+  Color get ink3 => dark ? const Color(0xFF98989F) : const Color(0xFF6C6C70);
 
   /// The ink that goes on top of a [fill]. White by construction — [fill]
   /// darkens the accent until white clears AA on it.
@@ -508,6 +509,44 @@ ThemeData buildTheme(Brightness b) {
     fontFamilyFallback: const ['Manrope'],
     splashFactory: NoSplash.splashFactory,
     highlightColor: const Color(0x00000000),
+    // iOS furniture for the Material pieces the screens still use: rounded
+    // sheets with a grabber, 14 pt dialogs, floating toasts and the system
+    // tint for text buttons, switches and pickers.
+    bottomSheetTheme: BottomSheetThemeData(
+      backgroundColor: p.card,
+      modalBackgroundColor: p.card,
+      showDragHandle: true,
+      dragHandleColor: p.dark ? const Color(0xFF5A5A5E) : const Color(0xFFC7C7CC),
+      dragHandleSize: const Size(36, 5),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(R.lg))),
+      surfaceTintColor: const Color(0x00000000),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: p.card,
+      surfaceTintColor: const Color(0x00000000),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(14))),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: p.dark ? const Color(0xFF2C2C2E) : const Color(0xFF1C1C1E),
+      contentTextStyle: const TextStyle(
+          fontFamily: '.SF Pro Text',
+          fontFamilyFallback: ['Manrope'],
+          fontSize: 15,
+          color: C.white),
+      shape: const RoundedRectangleBorder(borderRadius: R.rMd),
+      insetPadding: const EdgeInsets.fromLTRB(S.x4, 0, S.x4, S.x3),
+    ),
+    textButtonTheme: TextButtonThemeData(
+      style: TextButton.styleFrom(foregroundColor: p.on(C.blue)),
+    ),
+    dividerTheme: DividerThemeData(color: p.line, thickness: .5, space: .5),
+    cupertinoOverrideTheme: NoDefaultCupertinoThemeData(
+      primaryColor: C.blue,
+      brightness: b,
+    ),
     pageTransitionsTheme: PageTransitionsTheme(builders: {
       for (final e in const PageTransitionsTheme().builders.entries)
         e.key: _Gated(e.value),

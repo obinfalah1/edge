@@ -236,7 +236,7 @@ class _LogWorkoutState extends State<LogWorkout> {
 
   Future<void> _pickTime({required bool isStart}) async {
     final at = isStart ? _start : _end;
-    final picked = await showTimePicker(
+    final picked = await showAppTimePicker(
       context: context,
       initialTime: TimeOfDay(hour: at.hour, minute: at.minute),
     );

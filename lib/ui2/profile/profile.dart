@@ -38,6 +38,10 @@ class SetRow extends StatelessWidget {
   /// Replaces the value and chevron (e.g. a [Switch]).
   final Widget? trailing;
 
+  /// Read after the title by screen readers when [trailing] carries the
+  /// value (a switch row reads "Title, On").
+  final String semanticsValue;
+
   /// A brand mark in place of [icon] — Lucide has no GitHub/Discord/Reddit
   /// logo, and a generic glyph standing in for one of those is worse than
   /// the extra param. Sized and tinted the same as the [Icon] it replaces.
@@ -50,6 +54,7 @@ class SetRow extends StatelessWidget {
       this.danger = false,
       this.chevron = true,
       this.trailing,
+      this.semanticsValue = '',
       this.onTap})
       : glyph = null;
 
@@ -61,15 +66,43 @@ class SetRow extends StatelessWidget {
       this.chevron = true,
       this.onTap})
       : icon = null,
-        trailing = null;
+        trailing = null,
+        semanticsValue = '';
 
   @override
   Widget build(BuildContext c) {
     final p = P.of(c);
     final accent = danger ? C.red : color;
+    // A row whose value is just On or Off is a switch: draw the platform one
+    // (the iOS switch on iPhone) instead of a word that flips on tap. The
+    // whole row still toggles, as before, and the switch reads the same.
+    final l = AppLocalizations.of(c);
+    final onWord = l?.stateOn ?? 'On', offWord = l?.stateOff ?? 'Off';
+    final isToggle = trailing == null &&
+        !chevron &&
+        onTap != null &&
+        (value == onWord || value == offWord);
+    if (isToggle) {
+      return SetRow(icon ?? LucideIcons.circle, color, title,
+          sub: sub,
+          danger: danger,
+          chevron: false,
+          trailing: ExcludeSemantics(
+            child: Switch.adaptive(
+              value: value == onWord,
+              onChanged: (_) => onTap!(),
+            ),
+          ),
+          onTap: onTap,
+          semanticsValue: value);
+    }
     return Pressable(
       onTap: onTap,
-      semanticLabel: sub.isEmpty ? title : '$title. $sub',
+      semanticLabel: [
+        title,
+        if (semanticsValue.isNotEmpty) ', $semanticsValue',
+        if (sub.isNotEmpty) '. $sub',
+      ].join(),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: S.x3),
         child: Row(children: [

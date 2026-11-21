@@ -613,7 +613,7 @@ class _DataScreenState extends State<DataScreen> {
                 ]),
                 if (_busy) ...[
                   const SizedBox(height: S.x6),
-                  Center(child: CircularProgressIndicator(color: p.on(C.blue))),
+                  Center(child: CircularProgressIndicator.adaptive(valueColor: AlwaysStoppedAnimation<Color>(p.on(C.blue)))),
                   if (_progress != null) ...[
                     const SizedBox(height: S.x3),
                     Center(

@@ -972,7 +972,7 @@ class _DayTimelineScreenState extends State<DayTimelineScreen> {
       ...dayNavRow(_day ?? d.day, d.days, _goDay),
       if (_loading) ...[
         const SizedBox(height: S.x8),
-        const Center(child: CircularProgressIndicator()),
+        const Center(child: CircularProgressIndicator.adaptive()),
       ] else if (_failed) ...[
         const SizedBox(height: S.x2),
         StatusCard(
@@ -1460,10 +1460,7 @@ class _MomentRowState extends State<MomentRow> {
           expanded: _open,
           onTap: _toggle,
           excludeSemantics: true,
-          child: InkWell(
-            onTap: _toggle,
-            child: row,
-          ),
+          child: Pressable(onTap: _toggle, child: row),
         ),
         if (_open)
           Padding(

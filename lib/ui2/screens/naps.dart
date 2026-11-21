@@ -240,13 +240,13 @@ class _NapsScreenState extends State<NapsScreen> {
     final base = DateTime.tryParse(day);
     if (base == null) return;
     final l = AppLocalizations.of(context);
-    final from = await showTimePicker(
+    final from = await showAppTimePicker(
       context: context,
       initialTime: const TimeOfDay(hour: 14, minute: 0),
       helpText: l?.napsFellAsleepHelp ?? 'WHEN YOU FELL ASLEEP',
     );
     if (from == null || !mounted) return;
-    final to = await showTimePicker(
+    final to = await showAppTimePicker(
       context: context,
       initialTime: TimeOfDay(hour: (from.hour + 1) % 24, minute: from.minute),
       helpText: l?.napsWokeUpHelp ?? 'WHEN YOU WOKE UP',
@@ -333,7 +333,7 @@ class _NapsScreenState extends State<NapsScreen> {
       return detailScaffold(c, l?.napsTitle ?? 'Naps', const [
         Padding(
           padding: EdgeInsets.only(top: S.x8),
-          child: Center(child: CircularProgressIndicator()),
+          child: Center(child: CircularProgressIndicator.adaptive()),
         ),
       ]);
     }

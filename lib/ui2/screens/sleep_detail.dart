@@ -711,7 +711,7 @@ class _SleepDetailState extends State<SleepDetail> with RevisionReload {
     if (_loading && _d == null) {
       return _frame(c, title, [
         const SizedBox(height: S.x8),
-        Center(child: CircularProgressIndicator()),
+        Center(child: CircularProgressIndicator.adaptive()),
       ]);
     }
 
@@ -1189,13 +1189,13 @@ class _SleepDetailState extends State<SleepDetail> with RevisionReload {
     final onset = DateTime.fromMillisecondsSinceEpoch(t0 * 1000);
     final wake = DateTime.fromMillisecondsSinceEpoch(t1 * 1000);
     final l = AppLocalizations.of(context);
-    final bed = await showTimePicker(
+    final bed = await showAppTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(onset),
       helpText: l?.sleepDetailBedTimeHelp ?? 'WHEN YOU GOT INTO BED',
     );
     if (bed == null || !mounted) return;
-    final up = await showTimePicker(
+    final up = await showAppTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(wake),
       helpText: l?.sleepDetailWakeTimeHelp ?? 'WHEN YOU GOT UP',

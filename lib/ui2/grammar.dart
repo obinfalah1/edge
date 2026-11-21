@@ -119,10 +119,16 @@ class _PressableState extends State<Pressable> {
         onTapDown: (_) => setState(() => _down = true),
         onTapUp: (_) => setState(() => _down = false),
         onTapCancel: () => setState(() => _down = false),
-        child: AnimatedScale(
-          scale: _down ? .975 : 1,
+        // iOS highlights a pressed control by dimming it; the slight scale
+        // stays as the touch-down cue.
+        child: AnimatedOpacity(
+          opacity: _down ? .62 : 1,
           duration: motion(c, Motion.fast),
-          child: out,
+          child: AnimatedScale(
+            scale: _down ? .975 : 1,
+            duration: motion(c, Motion.fast),
+            child: out,
+          ),
         ),
       )),
     );
@@ -2646,7 +2652,7 @@ class BigButton extends StatelessWidget {
             if (busy) ...[
               SizedBox.square(
                   dimension: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: ink)),
+                  child: CircularProgressIndicator.adaptive(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(ink))),
               const SizedBox(width: S.x2),
             ] else if (icon != null) ...[
               Icon(icon, size: 18, color: ink),

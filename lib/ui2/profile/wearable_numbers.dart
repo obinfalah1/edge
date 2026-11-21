@@ -884,8 +884,8 @@ class _DeviceUseSwitchState extends State<DeviceUseSwitch> {
               d.busy
                   ? const SizedBox.square(
                       dimension: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : Switch(value: on, onChanged: _set),
+                      child: CircularProgressIndicator.adaptive(strokeWidth: 2))
+                  : Switch.adaptive(value: on, onChanged: _set),
             ]),
           ),
           if (wearable) ...[

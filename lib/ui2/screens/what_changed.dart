@@ -157,7 +157,7 @@ class _WhatChangedScreenState extends State<WhatChangedScreen> {
       ...dayNavRow(_day ?? d.day, d.days, _goDay),
       if (_loading) ...[
         const SizedBox(height: S.x8),
-        const Center(child: CircularProgressIndicator()),
+        const Center(child: CircularProgressIndicator.adaptive()),
       ] else
         ...whatChangedBody(c, d),
     ]);

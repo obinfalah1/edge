@@ -365,7 +365,7 @@ class PairingView extends StatelessWidget {
             ],
             if (busy) ...[
               const SizedBox(height: S.x8),
-              Center(child: CircularProgressIndicator(color: p.on(C.blue))),
+              Center(child: CircularProgressIndicator.adaptive(valueColor: AlwaysStoppedAnimation<Color>(p.on(C.blue)))),
             ],
             ..._advice(c, phase, detail),
             const SizedBox(height: S.x8),

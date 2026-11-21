@@ -305,7 +305,7 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
                       sub: _full
                           ? l.reportDatabaseCovered
                           : l.reportDatabaseWarning,
-                      trailing: Switch(
+                      trailing: Switch.adaptive(
                           value: _db || _full,
                           onChanged: _busy || _full
                               ? null
@@ -316,7 +316,7 @@ class _ReportIssueScreenState extends State<ReportIssueScreen> {
                           : () => setState(() => _db = !_db)),
                   SetRow(LucideIcons.database, C.red, l.reportFullDatabaseRow,
                       sub: l.reportFullDatabaseWarning,
-                      trailing: Switch(
+                      trailing: Switch.adaptive(
                           value: _full,
                           onChanged:
                               _busy ? null : (v) => setState(() => _full = v)),

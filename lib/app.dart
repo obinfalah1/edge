@@ -378,7 +378,7 @@ class _Loading extends StatelessWidget {
     final p = P.of(c);
     return Scaffold(
       backgroundColor: p.bg,
-      body: Center(child: CircularProgressIndicator(color: p.on(C.green))),
+      body: Center(child: CircularProgressIndicator.adaptive(valueColor: AlwaysStoppedAnimation<Color>(p.on(C.green)))),
     );
   }
 }

@@ -222,7 +222,7 @@ class _ReadinessDetailState extends State<ReadinessDetail> {
         sub: d.day == null ? '' : prettyDay(d.day, l), [
       if (_loading && _d == null) ...[
         const SizedBox(height: S.x8),
-        const Center(child: CircularProgressIndicator()),
+        const Center(child: CircularProgressIndicator.adaptive()),
       ] else ...[
         if (v == null) ...[
           // No `why:`. The pipeline records why readiness abstained on every

@@ -1471,7 +1471,7 @@ class NotificationSettingsView extends StatelessWidget {
   static String _hhmm(int minuteOfDay) => formatClockMinute(minuteOfDay);
 
   static Future<int?> _pickMinute(BuildContext c, int current) async {
-    final picked = await showTimePicker(
+    final picked = await showAppTimePicker(
       context: c,
       initialTime: TimeOfDay(hour: (current ~/ 60) % 24, minute: current % 60),
     );

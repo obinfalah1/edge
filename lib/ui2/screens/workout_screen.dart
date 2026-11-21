@@ -129,7 +129,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with RevisionReload {
         } else {
           body = const [
             SizedBox(height: S.x8),
-            Center(child: CircularProgressIndicator()),
+            Center(child: CircularProgressIndicator.adaptive()),
           ];
         }
         // THE LIST DROPS ITS SIDE PADDING and hands it to each child instead,

@@ -40,7 +40,7 @@ void main() {
         BandNotificationsView(onEnabled: (v) => toggled = v),
       );
       expect(find.text('Buzz on app notifications'), findsOneWidget);
-      expect(find.text('Off'), findsOneWidget);
+      expect(t.widget<Switch>(find.byType(Switch)).value, isFalse);
       await t.tap(find.text('Buzz on app notifications'));
       expect(toggled, isTrue);
     });

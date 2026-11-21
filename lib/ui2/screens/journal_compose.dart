@@ -179,7 +179,7 @@ class _JournalComposeState extends State<JournalCompose> {
     final cur = _values[key];
     if (cur == null) return;
     final l = AppLocalizations.of(context);
-    final at = await showTimePicker(
+    final at = await showAppTimePicker(
       context: context,
       initialTime: cur.atMinuteOfDay == null
           ? TimeOfDay.now()
@@ -291,7 +291,7 @@ class _JournalComposeState extends State<JournalCompose> {
                 sub: _date, onBack: () => Navigator.of(c).pop()),
             Expanded(
               child: _loading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? const Center(child: CircularProgressIndicator.adaptive())
                   : _loadFailed
                   ? Center(
                       child: Padding(
@@ -1029,7 +1029,7 @@ class _WeightTrendState extends State<_WeightTrend> {
     if (_loading) {
       return detailScaffold(c, title, const [
         SizedBox(height: S.x8),
-        Center(child: CircularProgressIndicator()),
+        Center(child: CircularProgressIndicator.adaptive()),
       ]);
     }
     final p = P.of(c);
@@ -1318,8 +1318,8 @@ class _JournalAiSheetState extends State<_JournalAiSheet> {
                             ? SizedBox(
                                 width: 18,
                                 height: 18,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: p.inkOnFill),
+                                child: CircularProgressIndicator.adaptive(
+                                    strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(p.inkOnFill)),
                               )
                             : Icon(LucideIcons.arrowUp, color: p.inkOnFill),
                       ),

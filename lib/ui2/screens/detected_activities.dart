@@ -161,7 +161,7 @@ class _DetectedActivitiesScreenState extends State<DetectedActivitiesScreen>
                       onFix: _load,
                     ),
                   if (items == null && _error == null)
-                    const Center(child: CircularProgressIndicator()),
+                    const Center(child: CircularProgressIndicator.adaptive()),
                   if (_error == null && items != null && items.isEmpty)
                     StatusCard(
                       l?.activityNothing ?? 'Nothing to review',
@@ -455,7 +455,7 @@ class _NapProposalEditorState extends State<NapProposalEditor> {
       lastDate: DateTime.now(),
     );
     if (day == null || !mounted) return;
-    final time = await showTimePicker(
+    final time = await showAppTimePicker(
       context: context,
       initialTime: TimeOfDay.fromDateTime(value),
     );

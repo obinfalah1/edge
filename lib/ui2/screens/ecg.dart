@@ -632,7 +632,7 @@ class EcgCaptureBody extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const CircularProgressIndicator(),
+              const CircularProgressIndicator.adaptive(),
               const SizedBox(height: S.x4),
               body(
                 s.phase == EcgCapturePhase.saving

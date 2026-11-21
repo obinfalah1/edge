@@ -639,7 +639,7 @@ class AlarmScreenView extends StatelessWidget {
   }
 
   Future<void> _pickDayTime(BuildContext c, AlarmScheduleEntry day) async {
-    final picked = await showTimePicker(
+    final picked = await showAppTimePicker(
       context: c,
       initialTime: TimeOfDay(hour: day.hour, minute: day.minute),
     );

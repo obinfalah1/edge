@@ -337,7 +337,7 @@ class _CircadianDetailState extends State<CircadianDetail> {
         [
       if (_loading && _d == null) ...[
         const SizedBox(height: S.x8),
-        const Center(child: CircularProgressIndicator()),
+        const Center(child: CircularProgressIndicator.adaptive()),
       ] else if (advanced) ...[
         if (drawn == 0)
           StatusCard(

@@ -261,7 +261,7 @@ class _LogFoodSheetState extends State<LogFoodSheet> {
   }
 
   Future<void> _pickTime() async {
-    final picked = await showTimePicker(
+    final picked = await showAppTimePicker(
       context: context,
       initialTime: _time ?? TimeOfDay.now(),
     );

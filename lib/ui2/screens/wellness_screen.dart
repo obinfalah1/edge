@@ -271,7 +271,7 @@ class _WellnessScreenState extends State<WellnessScreen> with RevisionReload {
   Widget build(BuildContext c) {
     final l = AppLocalizations.of(c);
     if (widget.sleepPlanOnly) {
-      if (_loading) return const Center(child: CircularProgressIndicator());
+      if (_loading) return const Center(child: CircularProgressIndicator.adaptive());
       return _failed ? _loadFailed(l) : _recovery(c);
     }
     final last = _breathing.isEmpty ? null : _breathing.first;
@@ -313,7 +313,7 @@ class _WellnessScreenState extends State<WellnessScreen> with RevisionReload {
               color: C.domMind),
           const SizedBox(height: S.x5),
           if (_loading)
-            const Center(child: CircularProgressIndicator())
+            const Center(child: CircularProgressIndicator.adaptive())
           else if (_failed)
             _loadFailed(l)
           else ...[
@@ -1337,7 +1337,7 @@ Future<MedSchedule?> pickMedSchedule(
               Pressable(
                 semanticLabel: l?.wellnessChangeTheTime ?? 'Change the time',
                 onTap: () async {
-                  final at = await showTimePicker(
+                  final at = await showAppTimePicker(
                     context: sheet,
                     initialTime: TimeOfDay(
                       hour: (minute ~/ 60) % 24,
@@ -1661,7 +1661,7 @@ class _JournalFindingsState extends State<JournalFindings> {
     if (_loading) {
       return detailScaffold(c, title, const [
         SizedBox(height: S.x8),
-        Center(child: CircularProgressIndicator()),
+        Center(child: CircularProgressIndicator.adaptive()),
       ]);
     }
     final p = P.of(c);

@@ -2294,7 +2294,7 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
     final spinner = SizedBox(
       width: 16,
       height: 16,
-      child: CircularProgressIndicator(strokeWidth: 2, color: P.of(c).ink3),
+      child: CircularProgressIndicator.adaptive(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(P.of(c).ink3)),
     );
 
     if (syncing) {
@@ -2395,7 +2395,7 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
         const SizedBox(height: S.x3),
         const DetectedActivitiesCard(),
         if (_loading)
-          const Center(child: CircularProgressIndicator())
+          const Center(child: CircularProgressIndicator.adaptive())
         else if (_failed)
           StatusCard(
             _day == null

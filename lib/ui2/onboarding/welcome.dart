@@ -740,7 +740,7 @@ class WelcomeView extends StatelessWidget {
             ),
             if (busy) ...[
               const SizedBox(height: S.x6),
-              Center(child: CircularProgressIndicator(color: p.on(C.blue))),
+              Center(child: CircularProgressIndicator.adaptive(valueColor: AlwaysStoppedAnimation<Color>(p.on(C.blue)))),
             ],
             if (o != null) ...[
               const SizedBox(height: S.x6),

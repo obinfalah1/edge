@@ -15,13 +15,13 @@ void main() {
     await t.pumpWidget(
       const MaterialApp(home: Scaffold(body: NapAutoLogRow())),
     );
-    expect(find.text('Off'), findsOneWidget);
+    expect(t.widget<Switch>(find.byType(Switch)).value, isFalse);
     expect(Prefs.getInt(Prefs.napAutoLogSinceSec, 0), 0);
 
     final before = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     await t.tap(find.text('Log clear naps automatically'));
     await t.pump();
-    expect(find.text('On'), findsOneWidget);
+    expect(t.widget<Switch>(find.byType(Switch)).value, isTrue);
     expect(
       Prefs.getInt(Prefs.napAutoLogSinceSec, 0),
       greaterThanOrEqualTo(before),
@@ -29,7 +29,7 @@ void main() {
 
     await t.tap(find.text('Log clear naps automatically'));
     await t.pump();
-    expect(find.text('Off'), findsOneWidget);
+    expect(t.widget<Switch>(find.byType(Switch)).value, isFalse);
     expect(Prefs.getInt(Prefs.napAutoLogSinceSec, 0), 0);
   });
 }

@@ -363,7 +363,7 @@ class _SignalPriorityScreenState extends State<SignalPriorityScreen> {
             child: NavBar(l?.devicesWhichSourceWins ?? 'Which source wins'),
           ),
           if (_loading)
-            const Expanded(child: Center(child: CircularProgressIndicator()))
+            const Expanded(child: Center(child: CircularProgressIndicator.adaptive()))
           else
             Expanded(
               child: ListView(

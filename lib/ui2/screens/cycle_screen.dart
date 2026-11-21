@@ -376,7 +376,7 @@ class _CycleTabState extends State<CycleTab> with RevisionReload {
         },
       );
     }
-    if (d == null) return const Center(child: CircularProgressIndicator());
+    if (d == null) return const Center(child: CircularProgressIndicator.adaptive());
 
     if (!d.enabled) {
       return StatusCard(
