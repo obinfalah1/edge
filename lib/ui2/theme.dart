@@ -29,6 +29,8 @@ import 'dart:math' as math;
 import 'package:flutter/cupertino.dart' show NoDefaultCupertinoThemeData;
 import 'package:flutter/material.dart';
 
+import 'moving_backdrop.dart';
+
 /// ── COLOUR ────────────────────────────────────────────────────────────────
 ///
 /// Raw pigment. These are *not* safe to paint text with directly — most of
@@ -144,7 +146,15 @@ class P {
         glass: t.extension<EdgeLook>()?.glass ?? false);
   }
 
-  Color get bg => dark
+  /// Dark Liquid Glass pages are see-through: the moving backdrop
+  /// (moving_backdrop.dart) is painted under each route instead.
+  bool get moving => dark && glass;
+
+  Color get bg => moving ? const Color(0x00000000) : bgSolid;
+
+  /// The page colour as a solid fill, for surfaces that must cover what is
+  /// behind them (a sheet, the launch cover) even when pages are see-through.
+  Color get bgSolid => dark
       ? const Color(0xFF000000)
       : (glass ? const Color(0xFFE4E5EA) : const Color(0xFFF2F2F7));
   Color get card => dark ? const Color(0xFF1C1C1E) : C.white;
@@ -505,8 +515,11 @@ class _Gated extends PageTransitionsBuilder {
   @override
   Widget buildTransitions<T>(PageRoute<T> route, BuildContext c,
       Animation<double> animation, Animation<double> secondary, Widget child) {
-    if (!Motion.enabled(c)) return child;
-    return inner.buildTransitions(route, c, animation, secondary, child);
+    // Dark Liquid Glass: each page carries the moving backdrop under it, so
+    // the see-through pages never show the page beneath during a push.
+    final page = P.of(c).moving ? MovingBackdrop(child: child) : child;
+    if (!Motion.enabled(c)) return page;
+    return inner.buildTransitions(route, c, animation, secondary, page);
   }
 }
 

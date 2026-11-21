@@ -79,7 +79,7 @@ class _Cover extends StatelessWidget {
     // route, so its own text has no Material ancestor to inherit from and debug
     // builds painted the missing-Material underline right across the wordmark.
     return Material(
-      color: p.bg,
+      color: p.bgSolid,
       child: Center(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Icon(LucideIcons.activity, size: 44, color: p.on(C.green)),

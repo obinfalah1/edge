@@ -1204,7 +1204,7 @@ class _JournalAiSheetState extends State<_JournalAiSheet> {
         child: Container(
           height: MediaQuery.of(c).size.height * 0.75,
           decoration: BoxDecoration(
-            color: p.bg,
+            color: p.bgSolid,
             borderRadius: BorderRadius.vertical(top: Radius.circular(R.lg)),
           ),
           child: Column(
