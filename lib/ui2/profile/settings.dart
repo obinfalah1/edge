@@ -45,7 +45,6 @@ import 'gallery.dart';
 import 'gestures.dart';
 import 'profile.dart';
 import 'report_issue.dart';
-import '../glass_look.dart';
 import '../../l10n/personal_text.dart';
 import 'wearable_numbers.dart' show WearableDisplay, wearableSettingsGroup;
 

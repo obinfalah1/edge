@@ -35,7 +35,8 @@ class _HealthspanScreenState extends State<HealthspanScreen> {
       age = (context.read<AppState>().user?['age'] as num?)?.round();
     } catch (_) {}
     final today = DateTime.now();
-    String day(int back) => _dayKey(today.subtract(Duration(days: back)));
+    String day(int back) =>
+        _dayKey(DateTime(today.year, today.month, today.day - back));
 
     Future<Map<String, double>> series(String key) async {
       try {

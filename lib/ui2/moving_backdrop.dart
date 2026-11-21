@@ -66,18 +66,18 @@ class _Fields extends CustomPainter {
   final ValueNotifier<double> t;
   _Fields(this.t) : super(repaint: t);
 
-  static const _fields = <(Color, double, double, double, double)>[
+  static final _fields = <(Color, double, double, double, double)>[
     // colour, x-speed, y-speed, phase, size (fraction of the long side)
-    (Color(0xFF16205C), .021, .017, 0.0, .75), // deep indigo
-    (Color(0xFF0A3A3E), .016, .023, 1.7, .70), // deep teal
-    (Color(0xFF2E1040), .019, .013, 3.1, .65), // deep plum
-    (Color(0xFF0A2247), .013, .019, 4.6, .70), // midnight blue
+    (GlassTok.fields[0], .021, .017, 0.0, .75),
+    (GlassTok.fields[1], .016, .023, 1.7, .70),
+    (GlassTok.fields[2], .019, .013, 3.1, .65),
+    (GlassTok.fields[3], .013, .019, 4.6, .70),
   ];
 
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
-    canvas.drawRect(rect, Paint()..color = const Color(0xFF000000));
+    canvas.drawRect(rect, Paint()..color = GlassTok.night);
     final long = math.max(size.width, size.height);
     final s = t.value;
     for (final (colour, sx, sy, ph, k) in _fields) {

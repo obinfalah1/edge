@@ -14,6 +14,8 @@ export 'ecg_widgets.dart';
 export 'nudges.dart';
 export 'paint_activity.dart';
 export 'pickers.dart';
+export 'moving_backdrop.dart';
+export 'glass_look.dart';
 export 'revision.dart';
 export 'scroll_hint.dart';
 export 'sleep_ring_model.dart';

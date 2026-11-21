@@ -43,7 +43,6 @@ import 'ui2/screens/sleep_tab.dart';
 import 'ui2/screens/wellness_screen.dart';
 import 'ui2/screens/workout_screen.dart';
 import 'ui2/ui2.dart';
-import 'ui2/glass_look.dart';
 import 'ui2/guides/guide_runner.dart';
 import 'ui2/profile/settings.dart' show MoreSettings;
 import 'ui2/guides/guide_dim.dart';

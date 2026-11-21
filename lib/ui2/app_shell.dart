@@ -227,27 +227,11 @@ class _TabBar extends StatelessWidget {
   @override
   Widget build(BuildContext c) {
     final p = P.of(c);
-    final glass = glassOf(c);
     return Container(
-      decoration: glass
-          ? BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: p.dark
-                    ? const [Color(0x29FFFFFF), Color(0x0FFFFFFF)]
-                    : const [Color(0xF2FFFFFF), Color(0xCCFFFFFF)],
-              ),
-              border: Border(
-                  top: BorderSide(
-                      color: p.dark
-                          ? const Color(0x47FFFFFF)
-                          : const Color(0x24000000))),
-            )
-          : BoxDecoration(
-              color: p.card,
-              border: Border(top: BorderSide(color: p.line)),
-            ),
+      decoration: BoxDecoration(
+        color: p.card,
+        border: Border(top: BorderSide(color: p.line)),
+      ),
       child: SafeArea(
         top: false,
         child: IntrinsicHeight(
@@ -293,7 +277,7 @@ class _GlassPillBar extends StatelessWidget {
           borderRadius: radius,
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF000000).withValues(alpha: p.dark ? .5 : .10),
+              color: p.shadow.withValues(alpha: p.dark ? .5 : .10),
               blurRadius: 18,
               spreadRadius: -6,
               offset: const Offset(0, 6),
@@ -317,8 +301,8 @@ class _GlassPillBar extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: p.dark
-                        ? const [Color(0x1FFFFFFF), Color(0x0AFFFFFF)]
-                        : const [Color(0x4DFFFFFF), Color(0x26FFFFFF)],
+                        ? GlassTok.pillDark
+                        : GlassTok.pillLight,
                   ),
                 ),
                 child: Row(children: [
@@ -366,7 +350,7 @@ class _Tab extends StatelessWidget {
     final halo = lens
         ? [
             Shadow(
-                color: p.dark ? const Color(0x4D000000) : const Color(0x80FFFFFF),
+                color: p.dark ? GlassTok.haloDark : GlassTok.haloLight,
                 blurRadius: 4),
           ]
         : null;
@@ -388,8 +372,8 @@ class _Tab extends StatelessWidget {
               ? BoxDecoration(
                   borderRadius: const BorderRadius.all(Radius.circular(28)),
                   color: p.dark
-                      ? const Color(0x1FFFFFFF)
-                      : const Color(0x33FFFFFF),
+                      ? GlassTok.lensDark
+                      : GlassTok.lensLight,
                 )
               : null,
           child: Column(

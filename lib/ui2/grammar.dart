@@ -37,6 +37,8 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart' show CustomSemanticsAction;
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:flutter/rendering.dart' show RenderAbstractViewport;
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -3293,6 +3295,53 @@ class NavBar extends StatelessWidget {
             child: Align(alignment: Alignment.centerRight, child: trailing),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// ── DAY SWIPE ── a horizontal swipe that steps between days ─────────────
+///
+/// Swipe right for the day before, left for the day after, as the day
+/// switcher's arrows do. Lives here because grammar.dart is where gestures
+/// are allowed; screen readers get the same two steps as custom actions.
+class DaySwipe extends StatelessWidget {
+  final Widget child;
+  final VoidCallback? onOlder, onNewer;
+  final String olderLabel, newerLabel;
+
+  const DaySwipe({
+    super.key,
+    required this.child,
+    this.onOlder,
+    this.onNewer,
+    this.olderLabel = 'Previous day',
+    this.newerLabel = 'Next day',
+  });
+
+  @override
+  Widget build(BuildContext c) {
+    if (onOlder == null && onNewer == null) return child;
+    return Semantics(
+      customSemanticsActions: {
+        CustomSemanticsAction(label: olderLabel): ?onOlder,
+        CustomSemanticsAction(label: newerLabel): ?onNewer,
+      },
+      child: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onHorizontalDragEnd: (d) {
+          final v = d.primaryVelocity ?? 0;
+          if (v.abs() < 250) return;
+          // In right-to-left text the directions swap with the layout.
+          final rtl = Directionality.of(c) == TextDirection.rtl;
+          final towardOlder = rtl ? v < 0 : v > 0;
+          final go = towardOlder ? onOlder : onNewer;
+          if (go != null) {
+            HapticFeedback.selectionClick();
+            go();
+          }
+        },
+        child: child,
       ),
     );
   }

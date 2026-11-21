@@ -288,6 +288,15 @@ Map<String, Widget> componentCases() => {
       ),
       'consistency': const Consistency(
           18, 24, 'Nights with a full sleep record', C.domHealth),
+      'day_swipe': DaySwipe(
+        onOlder: () {},
+        onNewer: () {},
+        child: const Surface(
+            child: Text('Swipe right for the day before, left for the next')),
+      ),
+      'moving_backdrop': const SizedBox(
+          height: 160,
+          child: MovingBackdrop(child: SizedBox.expand())),
       'pill_row': const Wrap(spacing: S.x2, runSpacing: S.x2, children: [
         Pill('Estimated', C.yellow, icon: LucideIcons.circleDashed),
         Pill('Relative', C.purple),

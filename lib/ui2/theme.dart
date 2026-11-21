@@ -523,6 +523,27 @@ class _Gated extends PageTransitionsBuilder {
   }
 }
 
+/// Liquid Glass colours that are not a palette accent: the tab pill's fill,
+/// its icon halo and selected lens, and the dark moving backdrop's fields.
+class GlassTok {
+  GlassTok._();
+  static const pillDark = [Color(0x1FFFFFFF), Color(0x0AFFFFFF)];
+  static const pillLight = [Color(0x4DFFFFFF), Color(0x26FFFFFF)];
+  static const haloDark = Color(0x4D000000);
+  static const haloLight = Color(0x80FFFFFF);
+  static const lensDark = Color(0x1FFFFFFF);
+  static const lensLight = Color(0x33FFFFFF);
+  static const night = Color(0xFF000000);
+
+  /// Deep indigo, deep teal, deep plum, midnight blue.
+  static const fields = [
+    Color(0xFF16205C),
+    Color(0xFF0A3A3E),
+    Color(0xFF2E1040),
+    Color(0xFF0A2247),
+  ];
+}
+
 /// The Liquid Glass look: on, cards and the tab bar are frosted glass (a
 /// translucent fill, a top highlight and a bright rim) over the same page
 /// colours; off, they are the flat cards. Carried on the theme so flipping it

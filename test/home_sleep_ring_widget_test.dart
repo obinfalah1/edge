@@ -411,14 +411,16 @@ void main() {
   });
 
   group('calibrating is unchanged', () {
-    testWidgets('a baseline note still draws the dashed ring', (t) async {
+    testWidgets('a baseline note draws a ring filled to nights banked',
+        (t) async {
       await _pump(
         t,
         _unslept(sleepMin: const Metric(note: 'need_baseline:have=3,need=14')),
       );
       final p = _sleepPainter(t);
-      expect(p, isA<DashedRing>());
-      expect((p as DashedRing).segments, 14);
+      // A continuous muted arc filling night by night, not 14 dashes.
+      expect(p, isA<Ring>());
+      expect((p as Ring).v, closeTo(3 / 14, 1e-9));
     });
   });
 }

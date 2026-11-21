@@ -1363,7 +1363,11 @@ class _RingState {
   /// reading, so it is not one.
   bool get measured => why == null && !calibrating;
 
-  Color arc(P p) => calibrating || provisional ? p.ink3 : p.on(color);
+  // Learning: the ring's own colour, softened, so it reads as the metric
+  // filling in rather than a grey placeholder. Provisional stays muted.
+  Color arc(P p) => provisional
+      ? p.ink3
+      : (calibrating ? p.on(color).withValues(alpha: .55) : p.on(color));
   Color ink(P p) => measured && !provisional ? p.on(color) : p.ink3;
 
   String get spoken => [
@@ -1550,8 +1554,11 @@ class _Dial extends StatelessWidget {
         painter: r.calibrating
             // One dash per night the baseline needs, not a fixed count —
             // "6 of 14" draws as 14 divisions with 6 filled.
-            ? DashedRing(r.frac ?? 0, r.arc(p), p.track,
-                stroke: stroke, segments: r.need ?? 24)
+            ? Ring(r.need == null || r.need == 0
+                    ? (r.frac ?? 0)
+                    : (r.have ?? 0) / r.need!,
+                r.arc(p), p.track,
+                stroke: stroke, t: animate(c, 1), background: p.card)
             : _stageArcs(r, p) != null
             ? StageRing(_stageArcs(r, p)!, p.track,
                 stroke: stroke, t: animate(c, 1), background: p.card)
@@ -2248,6 +2255,17 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
 
   /// Another day. The switcher never strands you off the record — [DayNav]
   /// already restricts the arrows to [_days] — so this just re-loads for it.
+  /// The day before (older) or after the one shown, from the same list and
+  /// in the same order as the day switcher's arrows (newest first).
+  String? _neighbourDay({required bool older}) {
+    final days = _days;
+    if (days.length < 2) return null;
+    final shown = _day ?? (_d?.dayId);
+    final i = days.indexOf(shown ?? '');
+    if (older) return i < 0 ? days.first : (i + 1 < days.length ? days[i + 1] : null);
+    return i > 0 ? days[i - 1] : null;
+  }
+
   void _goDay(String day) {
     setState(() {
       _day = homeSwitcherDay(day, now: widget.now);
@@ -2601,7 +2619,17 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
         // one tap away, on the Readiness screen: a wall of per-input
         // diagnostics on Home makes the app read as broken.
         if (RingTrio.has(d))
-          RingTrio(
+          // Swipe the rings right for the day before, left for the day after.
+          DaySwipe(
+            onOlder: _neighbourDay(older: true) == null
+                ? null
+                : () => _goDay(_neighbourDay(older: true)!),
+            onNewer: _neighbourDay(older: false) == null
+                ? null
+                : () => _goDay(_neighbourDay(older: false)!),
+            olderLabel: l?.metricDetailPreviousDay ?? 'Previous day',
+            newerLabel: l?.metricDetailNextDay ?? 'Next day',
+            child: RingTrio(
             d: d,
             onOpen: (k) => go(
                 c,
@@ -2618,7 +2646,7 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
                   // pick resolves to that one.
                   HomeRingKind.sleep => SleepDetail(day: isToday ? null : _day),
                 }),
-          )
+          ))
         else
           Builder(builder: (c) {
             final need = needMessageFromNote(d.readiness.note);
