@@ -43,6 +43,7 @@ import 'ui2/screens/sleep_tab.dart';
 import 'ui2/screens/wellness_screen.dart';
 import 'ui2/screens/workout_screen.dart';
 import 'ui2/ui2.dart';
+import 'ui2/glass_look.dart';
 import 'ui2/guides/guide_runner.dart';
 import 'ui2/profile/settings.dart' show MoreSettings;
 import 'ui2/guides/guide_dim.dart';
@@ -71,6 +72,8 @@ class _OpenStrapAppState extends State<OpenStrapApp> with WidgetsBindingObserver
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     settingsRestoredSignal.addListener(_onSettingsRestored);
+    GlassLook.load();
+    GlassLook.enabled.addListener(_onGlass);
     unawaited(LocalDb.setForeground(
         screenReadsForeground(WidgetsBinding.instance.lifecycleState)));
     // Hand the BYOK provider config to AppState (briefing generation + the
@@ -110,8 +113,11 @@ class _OpenStrapAppState extends State<OpenStrapApp> with WidgetsBindingObserver
     }
   }
 
+  void _onGlass() => setState(() {});
+
   @override
   void dispose() {
+    GlassLook.enabled.removeListener(_onGlass);
     settingsRestoredSignal.removeListener(_onSettingsRestored);
     WidgetsBinding.instance.removeObserver(this);
     _guideRunner.dispose();
@@ -201,8 +207,8 @@ class _OpenStrapAppState extends State<OpenStrapApp> with WidgetsBindingObserver
       title: 'OpenStrap',
       debugShowCheckedModeBanner: false,
       // The palette is the design system's, the CHOICE is still the user's.
-      theme: buildTheme(Brightness.light),
-      darkTheme: buildTheme(Brightness.dark),
+      theme: buildTheme(Brightness.light, glass: GlassLook.enabled.value),
+      darkTheme: buildTheme(Brightness.dark, glass: GlassLook.enabled.value),
       themeMode: theme.materialThemeMode,
       locale: locale.locale, // null = follow the OS locale
       // First, so a 12-hour choice reaches the time pickers (see the delegate).

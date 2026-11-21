@@ -504,7 +504,7 @@ class _SleepDetailState extends State<SleepDetail> with RevisionReload {
       onRefresh: _load,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(S.x4, S.x4, S.x4, S.x16),
+        padding: const EdgeInsets.fromLTRB(S.x4, S.x4, S.x4, S.x16 * 2),
         children: [
           ScreenTitle(title,
               trailing: const ProfileAvatar(accent: C.domSleep)),

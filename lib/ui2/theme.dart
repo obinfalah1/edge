@@ -132,11 +132,21 @@ class C {
 /// Brightness-resolved. `P.of(context)` in every build method.
 class P {
   final bool dark;
-  const P(this.dark);
 
-  static P of(BuildContext c) => P(Theme.of(c).brightness == Brightness.dark);
+  /// Liquid Glass is on (see [EdgeLook]): light mode sits on an off-white
+  /// page so the glass panels read, with a darker muted ink to keep AA there.
+  final bool glass;
+  const P(this.dark, {this.glass = false});
 
-  Color get bg => dark ? const Color(0xFF000000) : const Color(0xFFF2F2F7);
+  static P of(BuildContext c) {
+    final t = Theme.of(c);
+    return P(t.brightness == Brightness.dark,
+        glass: t.extension<EdgeLook>()?.glass ?? false);
+  }
+
+  Color get bg => dark
+      ? const Color(0xFF000000)
+      : (glass ? const Color(0xFFE4E5EA) : const Color(0xFFF2F2F7));
   Color get card => dark ? const Color(0xFF1C1C1E) : C.white;
   Color get card2 => dark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7);
   Color get line => dark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA);
@@ -153,7 +163,9 @@ class P {
   /// (light theme) / lightest (dark theme) surface it can sit on — so it is
   /// legible on every surface, not just the one it was eyeballed against.
   /// The values it replaces measured 4.34:1 and 3.21:1 respectively.
-  Color get ink3 => dark ? const Color(0xFF98989F) : const Color(0xFF6C6C70);
+  Color get ink3 => dark
+      ? const Color(0xFF98989F)
+      : (glass ? const Color(0xFF5E5E63) : const Color(0xFF6C6C70));
 
   /// The ink that goes on top of a [fill]. White by construction — [fill]
   /// darkens the accent until white clears AA on it.
@@ -498,9 +510,73 @@ class _Gated extends PageTransitionsBuilder {
   }
 }
 
-ThemeData buildTheme(Brightness b) {
-  final p = P(b == Brightness.dark);
+/// The Liquid Glass look: on, cards and the tab bar are frosted glass (a
+/// translucent fill, a top highlight and a bright rim) over the same page
+/// colours; off, they are the flat cards. Carried on the theme so flipping it
+/// rebuilds every screen. Off by default, which is what tests mount.
+class EdgeLook extends ThemeExtension<EdgeLook> {
+  final bool glass;
+  const EdgeLook({this.glass = false});
+
+  @override
+  EdgeLook copyWith({bool? glass}) => EdgeLook(glass: glass ?? this.glass);
+
+  @override
+  EdgeLook lerp(EdgeLook? other, double t) => t < .5 ? this : (other ?? this);
+}
+
+bool glassOf(BuildContext c) =>
+    Theme.of(c).extension<EdgeLook>()?.glass ?? false;
+
+/// The glass fill for a card-sized panel. Its blend over [P.bg] stays close
+/// to [P.card], so every contrast the tokens were solved for still holds.
+BoxDecoration glassDecoration(P p,
+        {BorderRadius radius = R.rLg, List<BoxShadow>? shadow}) =>
+    BoxDecoration(
+      borderRadius: radius,
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: p.dark
+            ? const [Color(0x2EFFFFFF), Color(0x14FFFFFF)]
+            : const [Color(0xB8FFFFFF), Color(0x6BFFFFFF)],
+      ),
+      boxShadow: shadow ?? p.el(1),
+    );
+
+/// The glass rim: bright along the top edge, fading down the sides.
+class GlassRim extends CustomPainter {
+  final bool dark;
+  final BorderRadius radius;
+  const GlassRim(this.dark, {this.radius = R.rLg});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final rr = radius.toRRect(rect).deflate(.5);
+    canvas.drawRRect(
+      rr,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: dark
+              ? const [Color(0x66FFFFFF), Color(0x14FFFFFF)]
+              : const [Color(0xFFFFFFFF), Color(0x29000000)],
+        ).createShader(rect),
+    );
+  }
+
+  @override
+  bool shouldRepaint(GlassRim old) => old.dark != dark || old.radius != radius;
+}
+
+ThemeData buildTheme(Brightness b, {bool glass = false}) {
+  final p = P(b == Brightness.dark, glass: glass);
   return ThemeData(
+    extensions: [EdgeLook(glass: glass)],
     brightness: b,
     scaffoldBackgroundColor: p.bg,
     colorScheme:

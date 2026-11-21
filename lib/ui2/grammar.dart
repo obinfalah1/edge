@@ -707,16 +707,27 @@ class Surface extends StatelessWidget {
     return Pressable(
       onTap: onTap,
       semanticLabel: semanticLabel,
-      child: GuideUnitMark(component: c, child: Container(
-        width: double.infinity,
-        padding: pad,
-        decoration: BoxDecoration(
-          color: color ?? p.card,
-          borderRadius: R.rLg,
-          boxShadow: p.el(elevation),
-        ),
-        child: child,
-      )),
+      child: GuideUnitMark(component: c, child: glassOf(c) && color == null
+          // Liquid Glass: frosted fill, top highlight and a bright rim.
+          ? CustomPaint(
+              foregroundPainter: GlassRim(p.dark),
+              child: Container(
+                width: double.infinity,
+                padding: pad,
+                decoration: glassDecoration(p, shadow: p.el(elevation)),
+                child: child,
+              ),
+            )
+          : Container(
+              width: double.infinity,
+              padding: pad,
+              decoration: BoxDecoration(
+                color: color ?? p.card,
+                borderRadius: R.rLg,
+                boxShadow: p.el(elevation),
+              ),
+              child: child,
+            )),
     );
   }
 }

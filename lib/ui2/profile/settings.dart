@@ -45,6 +45,8 @@ import 'gallery.dart';
 import 'gestures.dart';
 import 'profile.dart';
 import 'report_issue.dart';
+import '../glass_look.dart';
+import '../../l10n/personal_text.dart';
 import 'wearable_numbers.dart' show WearableDisplay, wearableSettingsGroup;
 
 /// Unwind the profile stack back to the gate.
@@ -821,6 +823,17 @@ class MoreSettingsView extends StatelessWidget {
                   SetRow(LucideIcons.sun, C.yellow,
                       l?.settingsAppearanceRowTitle ?? 'Appearance',
                       value: appearance, onTap: onCycleAppearance),
+                  // Personal addition: English/Arabic only (tr), not in ARBs.
+                  ValueListenableBuilder<bool>(
+                    valueListenable: GlassLook.enabled,
+                    builder: (c, glass, _) => SetRow(
+                        LucideIcons.droplet, C.blue, 'Liquid Glass',
+                        sub: tr(c, 'Frosted glass cards and tab bar',
+                            'بطاقات وشريط تبويب بمظهر الزجاج'),
+                        value: glass ? on : off,
+                        chevron: false,
+                        onTap: () => GlassLook.set(!glass)),
+                  ),
                   SetRow(LucideIcons.clock, C.teal,
                       l?.settingsClockFormatRowTitle ?? 'Time format',
                       value: switch (clockFormat) {

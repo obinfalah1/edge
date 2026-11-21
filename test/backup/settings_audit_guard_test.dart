@@ -27,7 +27,7 @@ const _mustTravel = {
   'prayer_buzz_on_dhuhr', 'prayer_buzz_on_asr', 'prayer_buzz_on_maghrib',
   'prayer_buzz_on_isha', 'prayer_buzz_offset_min', 'prayer_buzz_count',
   'coach_api', 'coach_model', 'coach_timeout_seconds',
-  'coach_use_chatgpt', 'coach_use_apple',
+  'coach_use_chatgpt', 'coach_use_apple', 'ui.liquid_glass',
   'ai_morning_enabled', 'ai_morning_min', 'ai_evening_enabled', 'ai_evening_min',
   'ai_journal_enabled', 'ai_journal_min',
   'workout.zone_alert_enabled', 'workout.zone_alert_target_zone', 'workout.rpe_skips',

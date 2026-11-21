@@ -85,7 +85,8 @@ import 'sleep_detail.dart';
 // ═══════════════════ shared plumbing ═══════════════════
 
 /// Page padding. The bottom inset clears the shell's floating nav.
-const pad = EdgeInsets.fromLTRB(S.x4, 0, S.x4, S.x16 + S.x8);
+// Clears the floating glass tab bar, which content scrolls under.
+const pad = EdgeInsets.fromLTRB(S.x4, 0, S.x4, S.x16 * 2);
 
 /// Push a detail screen. Every drill-down in ui2 goes through here.
 ///

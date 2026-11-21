@@ -11,6 +11,8 @@
 // a screen can do on its own. Anything that feels like another destination is
 // a section or a pushed screen inside the domain that owns it.
 
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -184,6 +186,8 @@ class _AppShellState extends State<AppShell> {
       },
       child: Scaffold(
         backgroundColor: p.bg,
+        // The glass pill floats over the content, which scrolls under it.
+        extendBody: glassOf(c),
         body: SafeArea(
           bottom: false,
           child: Column(
@@ -206,7 +210,9 @@ class _AppShellState extends State<AppShell> {
             ],
           ),
         ),
-        bottomNavigationBar: _TabBar(current: _current, onTap: _select),
+        bottomNavigationBar: glassOf(c)
+            ? _GlassPillBar(current: _current, onTap: _select)
+            : _TabBar(current: _current, onTap: _select),
       ),
     );
   }
@@ -221,11 +227,27 @@ class _TabBar extends StatelessWidget {
   @override
   Widget build(BuildContext c) {
     final p = P.of(c);
+    final glass = glassOf(c);
     return Container(
-      decoration: BoxDecoration(
-        color: p.card,
-        border: Border(top: BorderSide(color: p.line)),
-      ),
+      decoration: glass
+          ? BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: p.dark
+                    ? const [Color(0x29FFFFFF), Color(0x0FFFFFFF)]
+                    : const [Color(0xF2FFFFFF), Color(0xCCFFFFFF)],
+              ),
+              border: Border(
+                  top: BorderSide(
+                      color: p.dark
+                          ? const Color(0x47FFFFFF)
+                          : const Color(0x24000000))),
+            )
+          : BoxDecoration(
+              color: p.card,
+              border: Border(top: BorderSide(color: p.line)),
+            ),
       child: SafeArea(
         top: false,
         child: IntrinsicHeight(
@@ -248,12 +270,90 @@ class _TabBar extends StatelessWidget {
   }
 }
 
+/// Liquid Glass tab bar: a floating capsule that blurs what scrolls under it,
+/// with a translucent fill, a bright rim and the selected tab in a lens.
+class _GlassPillBar extends StatelessWidget {
+  final ShellDomain current;
+  final ValueChanged<ShellDomain> onTap;
+
+  const _GlassPillBar({required this.current, required this.onTap});
+
+  @override
+  Widget build(BuildContext c) {
+    final p = P.of(c);
+    // Squarer than a capsule: a rounded rectangle.
+    const radius = BorderRadius.all(Radius.circular(22));
+    final bottom = MediaQuery.paddingOf(c).bottom;
+    // Min height: the bottom bar slot hands down loose constraints, and the
+    // blur layer would otherwise take the whole screen.
+    return Column(mainAxisSize: MainAxisSize.min, children: [Padding(
+      padding: EdgeInsets.fromLTRB(S.x4, 0, S.x4, bottom > 0 ? bottom - 6 : S.x3),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF000000).withValues(alpha: p.dark ? .5 : .10),
+              blurRadius: 18,
+              spreadRadius: -6,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: radius,
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+            child: CustomPaint(
+              foregroundPainter: GlassRim(p.dark, radius: radius),
+              child: Container(
+                // A floor, not a fixed height: larger text grows the pill.
+                constraints: const BoxConstraints(minHeight: 68),
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  borderRadius: radius,
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: p.dark
+                        ? const [Color(0x3DFFFFFF), Color(0x1AFFFFFF)]
+                        : const [Color(0x8CFFFFFF), Color(0x52FFFFFF)],
+                  ),
+                ),
+                child: Row(children: [
+                  for (final d in ShellDomain.values)
+                    Expanded(
+                      child: _Tab(
+                        domain: d,
+                        on: d == current,
+                        onTap: () => onTap(d),
+                        lens: true,
+                      ),
+                    ),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      ),
+    )]);
+  }
+}
+
 class _Tab extends StatelessWidget {
   final ShellDomain domain;
   final bool on;
   final VoidCallback onTap;
 
-  const _Tab({required this.domain, required this.on, required this.onTap});
+  /// In the glass pill the selected tab sits in a clear lens instead of a
+  /// tinted chip around the icon.
+  final bool lens;
+
+  const _Tab(
+      {required this.domain,
+      required this.on,
+      required this.onTap,
+      this.lens = false});
 
   @override
   Widget build(BuildContext c) {
@@ -265,8 +365,34 @@ class _Tab extends StatelessWidget {
       child: Pressable(
         onTap: onTap,
         semanticLabel: label,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+        child: AnimatedContainer(
+          duration: motion(c, Motion.base),
+          // In the pill the selected tab is a rounded rectangle the full width
+          // of its slot (not a circle hugging the label).
+          width: lens ? double.infinity : null,
+          margin: lens ? const EdgeInsets.symmetric(horizontal: 2) : null,
+          padding: EdgeInsets.symmetric(vertical: lens ? 5 : 6, horizontal: 2),
+          decoration: lens && on
+              ? BoxDecoration(
+                  borderRadius: const BorderRadius.all(Radius.circular(16)),
+                  color: p.dark
+                      ? const Color(0x2EFFFFFF)
+                      : const Color(0xE6FFFFFF),
+                  border: Border.all(
+                      width: .8,
+                      color: p.dark
+                          ? const Color(0x3DFFFFFF)
+                          : const Color(0x14000000)),
+                  boxShadow: p.dark
+                      ? null
+                      : const [
+                          BoxShadow(
+                              color: Color(0x14000000),
+                              blurRadius: 6,
+                              offset: Offset(0, 1)),
+                        ],
+                )
+              : null,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -277,7 +403,9 @@ class _Tab extends StatelessWidget {
                 vertical: S.x1,
               ),
               decoration: BoxDecoration(
-                color: on ? p.wash(domain.accent) : const Color(0x00000000),
+                color: on && !lens
+                    ? p.wash(domain.accent)
+                    : const Color(0x00000000),
                 borderRadius: R.rPill,
               ),
               child: Icon(domain.icon, size: 20, color: ink),
