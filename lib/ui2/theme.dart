@@ -563,7 +563,7 @@ class GlassRim extends CustomPainter {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: dark
-              ? const [Color(0x66FFFFFF), Color(0x14FFFFFF)]
+              ? const [Color(0x8CFFFFFF), Color(0x33FFFFFF)]
               : const [Color(0xFFFFFFFF), Color(0x29000000)],
         ).createShader(rect),
     );

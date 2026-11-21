@@ -303,7 +303,8 @@ class _GlassPillBar extends StatelessWidget {
         child: ClipRRect(
           borderRadius: radius,
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+            // Light blur, like Apple's: what is behind stays readable and colourful.
+            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
             child: CustomPaint(
               foregroundPainter: GlassRim(p.dark, radius: radius),
               child: Container(
@@ -316,8 +317,8 @@ class _GlassPillBar extends StatelessWidget {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: p.dark
-                        ? const [Color(0x3DFFFFFF), Color(0x1AFFFFFF)]
-                        : const [Color(0x8CFFFFFF), Color(0x52FFFFFF)],
+                        ? const [Color(0x1FFFFFFF), Color(0x0AFFFFFF)]
+                        : const [Color(0x4DFFFFFF), Color(0x26FFFFFF)],
                   ),
                 ),
                 child: Row(children: [
@@ -360,6 +361,15 @@ class _Tab extends StatelessWidget {
     final p = P.of(c);
     // iOS 26: unselected items in the label colour, the selected one tinted.
     final ink = on ? p.on(domain.accent) : (lens ? p.ink : p.ink3);
+    // On the clear glass bar, a soft halo keeps icons and labels readable
+    // over whatever scrolls beneath (Apple does this with vibrancy).
+    final halo = lens
+        ? [
+            Shadow(
+                color: p.dark ? const Color(0x4D000000) : const Color(0x80FFFFFF),
+                blurRadius: 4),
+          ]
+        : null;
     final label = domain.title(c);
     return Semantics(
       selected: on,
@@ -378,8 +388,8 @@ class _Tab extends StatelessWidget {
               ? BoxDecoration(
                   borderRadius: const BorderRadius.all(Radius.circular(28)),
                   color: p.dark
-                      ? const Color(0x24FFFFFF)
-                      : const Color(0x14000000),
+                      ? const Color(0x1FFFFFFF)
+                      : const Color(0x33FFFFFF),
                 )
               : null,
           child: Column(
@@ -397,7 +407,8 @@ class _Tab extends StatelessWidget {
                     : const Color(0x00000000),
                 borderRadius: R.rPill,
               ),
-              child: Icon(domain.icon, size: lens ? 22 : 20, color: ink),
+              child: Icon(domain.icon,
+                  size: lens ? 22 : 20, color: ink, shadows: halo),
             ),
               const SizedBox(height: 3),
               Text(
@@ -406,6 +417,7 @@ class _Tab extends StatelessWidget {
               style: F.over.copyWith(
                 color: ink,
                 fontWeight: on ? FontWeight.w600 : FontWeight.w500,
+                shadows: halo,
               ),
               ),
             ],
