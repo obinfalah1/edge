@@ -281,13 +281,13 @@ class _GlassPillBar extends StatelessWidget {
   @override
   Widget build(BuildContext c) {
     final p = P.of(c);
-    // Squarer than a capsule: a rounded rectangle.
-    const radius = BorderRadius.all(Radius.circular(22));
+    // A full capsule, as Apple's own iOS 26 tab bars (App Store, Music).
+    const radius = BorderRadius.all(Radius.circular(32));
     final bottom = MediaQuery.paddingOf(c).bottom;
     // Min height: the bottom bar slot hands down loose constraints, and the
     // blur layer would otherwise take the whole screen.
     return Column(mainAxisSize: MainAxisSize.min, children: [Padding(
-      padding: EdgeInsets.fromLTRB(S.x4, 0, S.x4, bottom > 0 ? bottom - 6 : S.x3),
+      padding: EdgeInsets.fromLTRB(S.x5, 0, S.x5, bottom > 0 ? bottom - 8 : S.x3),
       child: DecoratedBox(
         decoration: BoxDecoration(
           borderRadius: radius,
@@ -308,8 +308,8 @@ class _GlassPillBar extends StatelessWidget {
               foregroundPainter: GlassRim(p.dark, radius: radius),
               child: Container(
                 // A floor, not a fixed height: larger text grows the pill.
-                constraints: const BoxConstraints(minHeight: 68),
-                padding: const EdgeInsets.all(5),
+                constraints: const BoxConstraints(minHeight: 64),
+                padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
                   borderRadius: radius,
                   gradient: LinearGradient(
@@ -358,7 +358,8 @@ class _Tab extends StatelessWidget {
   @override
   Widget build(BuildContext c) {
     final p = P.of(c);
-    final ink = on ? p.on(domain.accent) : p.ink3;
+    // iOS 26: unselected items in the label colour, the selected one tinted.
+    final ink = on ? p.on(domain.accent) : (lens ? p.ink : p.ink3);
     final label = domain.title(c);
     return Semantics(
       selected: on,
@@ -372,25 +373,13 @@ class _Tab extends StatelessWidget {
           width: lens ? double.infinity : null,
           margin: lens ? const EdgeInsets.symmetric(horizontal: 2) : null,
           padding: EdgeInsets.symmetric(vertical: lens ? 5 : 6, horizontal: 2),
+          // The selected tab's own soft capsule, as in Apple's iOS 26 bars.
           decoration: lens && on
               ? BoxDecoration(
-                  borderRadius: const BorderRadius.all(Radius.circular(16)),
+                  borderRadius: const BorderRadius.all(Radius.circular(28)),
                   color: p.dark
-                      ? const Color(0x2EFFFFFF)
-                      : const Color(0xE6FFFFFF),
-                  border: Border.all(
-                      width: .8,
-                      color: p.dark
-                          ? const Color(0x3DFFFFFF)
-                          : const Color(0x14000000)),
-                  boxShadow: p.dark
-                      ? null
-                      : const [
-                          BoxShadow(
-                              color: Color(0x14000000),
-                              blurRadius: 6,
-                              offset: Offset(0, 1)),
-                        ],
+                      ? const Color(0x24FFFFFF)
+                      : const Color(0x14000000),
                 )
               : null,
           child: Column(
@@ -408,7 +397,7 @@ class _Tab extends StatelessWidget {
                     : const Color(0x00000000),
                 borderRadius: R.rPill,
               ),
-              child: Icon(domain.icon, size: 20, color: ink),
+              child: Icon(domain.icon, size: lens ? 22 : 20, color: ink),
             ),
               const SizedBox(height: 3),
               Text(
