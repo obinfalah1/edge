@@ -164,6 +164,77 @@ class _WorkoutScreenState extends State<WorkoutScreen> with RevisionReload {
     );
   }
 
+  /// Line's start: a signage panel, the activity count, a gold button.
+  Widget _lineStart(BuildContext c, P p, _WorkoutData d) {
+    final loc = AppLocalizations.of(c);
+    return Pressable(
+      onTap: () => _openPicker(c, d),
+      semanticLabel: 'Start a session, ${allActivities.length} activities',
+      child: Container(
+        padding: const EdgeInsets.all(S.x4),
+        decoration: const BoxDecoration(color: LineTok.sign, borderRadius: R.rMetro),
+        child: Row(children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('Start a session',
+                  style: F.t2.copyWith(
+                      color: LineTok.signInk,
+                      fontFamily: LineTok.display,
+                      fontWeight: FontWeight.w500)),
+              Text('${allActivities.length} ${loc?.workoutActivitiesNoun ?? 'activities'}',
+                  style: F.cap.copyWith(color: LineTok.signMute)),
+            ]),
+          ),
+          Container(
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: S.x5),
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(color: LineTok.lapis, borderRadius: R.rPill),
+            child: Text('Start',
+                style: F.body.copyWith(color: LineTok.sign, fontWeight: FontWeight.w600)),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  /// Line's week: one row per day, like a timetable. Only what is known:
+  /// whether the day had a workout.
+  Widget _lineWeek(BuildContext c, P p, _WorkoutData d) {
+    const names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    final today = DateTime.now().weekday - 1;
+    return Surface(
+      pad: const EdgeInsets.symmetric(horizontal: S.x4),
+      child: Column(children: [
+        for (var i = 0; i < 7; i++)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: S.x3),
+            decoration: i == 0
+                ? null
+                : BoxDecoration(border: Border(top: BorderSide(color: p.line))),
+            child: Row(children: [
+              SizedBox(
+                width: 110,
+                child: Text(i == today ? 'Today' : names[i],
+                    style: F.body.copyWith(
+                        color: p.ink,
+                        fontWeight: i == today ? FontWeight.w600 : FontWeight.w400)),
+              ),
+              Expanded(
+                child: Text(
+                    d.weekDays.contains(i)
+                        ? 'Workout logged'
+                        : (i > today ? '' : 'Rest'),
+                    style: F.cap.copyWith(color: p.ink3)),
+              ),
+              if (d.weekDays.contains(i))
+                Icon(LucideIcons.circleCheck, size: 18, color: p.on(LineTok.green)),
+            ]),
+          ),
+      ]),
+    );
+  }
+
   void _openPicker(BuildContext c, _WorkoutData d) =>
       Navigator.of(c).push(MaterialPageRoute(
           builder: (_) => ActivityPicker(
@@ -177,6 +248,11 @@ class _WorkoutScreenState extends State<WorkoutScreen> with RevisionReload {
     final p = P.of(c);
     final loc = AppLocalizations.of(c);
     return [
+      if (p.metro)
+        // Line: the start is a sign with one gold action, not an
+        // illustrated card. Same picker behind it.
+        _lineStart(c, p, d)
+      else
       StartCard(
         label: loc?.workoutStartSessionLabel ?? 'START A SESSION',
         count: allActivities.length,
@@ -226,7 +302,7 @@ class _WorkoutScreenState extends State<WorkoutScreen> with RevisionReload {
       ),
       Section(
         loc?.workoutThisWeek ?? 'This week',
-        Surface(
+        p.metro ? _lineWeek(c, p, d) : Surface(
           child: Row(
             children: List.generate(7, (i) {
               final days = [

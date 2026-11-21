@@ -362,7 +362,40 @@ class AlarmScreenView extends StatelessWidget {
                   ),
                   const SizedBox(height: S.x3),
                 ],
-                if (at != null) ...[
+                if (at != null && p.metro) ...[
+                  // Line: the next alarm on a signage panel, the time in
+                  // large figures, the band's confirmation in gold.
+                  Container(
+                    padding: const EdgeInsets.all(S.x4),
+                    decoration: const BoxDecoration(
+                        color: LineTok.sign, borderRadius: R.rMetro),
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Next alarm',
+                              style: F.cap.copyWith(color: LineTok.signMute)),
+                          const SizedBox(height: S.x1),
+                          Text(_hhmm(at),
+                              style: F.n48.copyWith(
+                                  color: LineTok.signInk,
+                                  fontFamily: LineTok.display,
+                                  fontWeight: FontWeight.w300)),
+                          Text(
+                              '${_whichDay(c, at, now ?? DateTime.now())}, '
+                              '${_localizedStateLabel(c, state).toLowerCase()}',
+                              style: F.cap.copyWith(
+                                  color: state == AlarmArmState.confirmed
+                                      ? LineTok.lapis
+                                      : LineTok.signMute)),
+                        ]),
+                  ),
+                  if (_stateDetail(c, state) case final detail?) ...[
+                    const SizedBox(height: S.x3),
+                    StatusCard(_stateHeadline(c, state), detail,
+                        icon: _stateIcon(state)),
+                  ],
+                  const SizedBox(height: S.x4),
+                ] else if (at != null) ...[
                   Surface(
                     child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -468,9 +501,9 @@ class AlarmScreenView extends StatelessWidget {
     final buzz = fajrNext;
     final when = buzz == null
         ? _fajrText('Fetching prayer times…')
-        : '${_whichDay(c, buzz, now ?? DateTime.now())} · '
+        : calm(P.of(c), '${_whichDay(c, buzz, now ?? DateTime.now())} · '
             '${_fajrText('Fajr')} ${prayer == null ? '' : _hhmm(prayer)} → '
-            '${_fajrText('buzz')} ${_hhmm(buzz)}';
+            '${_fajrText('buzz')} ${_hhmm(buzz)}');
     final where = switch (fajrSource) {
       'gps' => _fajrText('Your location'),
       'last' => _fajrText('Your last location'),
@@ -488,6 +521,8 @@ class AlarmScreenView extends StatelessWidget {
         SetRow(LucideIcons.sunrise, C.yellow, _fajrText('Fajr alarm'),
             value: f.enabled ? (l?.stateOn ?? 'On') : (l?.stateOff ?? 'Off'),
             chevron: false,
+            badge: 'F',
+            badgeOn: f.enabled,
             onTap: () => _run(c, () => set(on: !f.enabled),
                 f.enabled
                     ? _fajrText('Fajr alarm off')
@@ -571,6 +606,8 @@ class AlarmScreenView extends StatelessWidget {
           pr.label(ar),
           sub: prayerToday[pr] == null ? '' : _hhmm(prayerToday[pr]!),
           chevron: false,
+          badge: pr.api.substring(0, 1),
+          badgeOn: s.isOn(pr),
           trailing: Switch.adaptive(
             value: s.isOn(pr),
             onChanged: onSetPrayer == null

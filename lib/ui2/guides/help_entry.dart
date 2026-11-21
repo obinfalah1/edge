@@ -45,7 +45,7 @@ class HelpEntry extends StatelessWidget {
             child: Row(children: [
               Icon(LucideIcons.search, size: 16, color: p.ink3),
               const SizedBox(width: S.x2),
-              Text(label, style: F.body.copyWith(color: p.ink3)),
+              Text('Search features', style: F.body.copyWith(color: p.ink3)),
             ]),
           ),
         ),

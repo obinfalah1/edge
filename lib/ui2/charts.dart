@@ -695,6 +695,52 @@ class LineTrack extends CustomPainter implements GuideDecoration {
       o.fill != fill || o.stops != stops || o.color != color || o.track != track;
 }
 
+/// Today against its own recent days: the middle half of the days shown
+/// (25th to 75th percentile) as a band, and the latest day as a marker. Only
+/// drawn from at least seven real days; fewer than that is no range at all.
+class RangeMark extends CustomPainter implements GuideDecoration {
+  final ({double lo, double hi, double min, double max, double now}) r;
+  final Color band, marker, rail;
+  const RangeMark(this.r,
+      {required this.band, required this.marker, required this.rail});
+
+  static ({double lo, double hi, double min, double max, double now})? of(
+      List<double?> series) {
+    final v = [for (final x in series) if (x != null && x.isFinite) x];
+    if (v.length < 7) return null;
+    final now = v.last;
+    final s = [...v]..sort();
+    double q(double p) => s[((s.length - 1) * p).round()];
+    final lo = q(.25), hi = q(.75);
+    var mn = s.first, mx = s.last;
+    final pad = (mx - mn) == 0 ? 1.0 : (mx - mn) * .12;
+    mn -= pad;
+    mx += pad;
+    return (lo: lo, hi: hi, min: mn, max: mx, now: now);
+  }
+
+  @override
+  void paint(Canvas cv, Size s) {
+    double x(double v) => (v - r.min) / (r.max - r.min) * s.width;
+    final y = s.height / 2;
+    cv.drawLine(Offset(0, y), Offset(s.width, y),
+        Paint()
+          ..color = rail
+          ..strokeWidth = 2);
+    cv.drawRRect(
+        RRect.fromLTRBR(x(r.lo), y - 4, x(r.hi).clamp(x(r.lo) + 3, s.width), y + 4,
+            const Radius.circular(4)),
+        Paint()..color = band);
+    final m = x(r.now);
+    cv.drawRRect(
+        RRect.fromLTRBR(m - 1.5, 0, m + 1.5, s.height, const Radius.circular(2)),
+        Paint()..color = marker);
+  }
+
+  @override
+  bool shouldRepaint(RangeMark o) => o.r != r || o.band != band || o.marker != marker;
+}
+
 /// One coloured arc of a [StageRing]: [fraction] of the FULL circle.
 class RingArc {
   final Color color;
@@ -860,6 +906,55 @@ extension SleepStageX on SleepStage {
 /// [stages] is one entry per epoch, in order. It comes from the stager; this
 /// painter has no opinion about what a night looks like.
 class Hypnogram extends CustomPainter implements GuidePlot {
+  /// Line: each stage is a metro line (a thin rail across the night) and the
+  /// night travels along them, changing line at an interchange at every
+  /// stage change. Same lanes, same colours, same order as the default.
+  void _metro(Canvas cv, Size s) {
+    final v = columns(stages, (s.width / 3).floor());
+    final lane = s.height / 4, w = s.width / v.length;
+    final n = (v.length * t.clamp(0, 1)).round().clamp(1, v.length);
+    final ink = cols(p);
+    double yOf(SleepStage st) => st.index * lane + lane / 2;
+    final rail = Paint()
+      ..color = p.line
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    for (final st in SleepStage.values) {
+      cv.drawLine(Offset(3, yOf(st)), Offset(s.width - 3, yOf(st)), rail);
+    }
+    final change = Paint()
+      ..color = p.ink3.withValues(alpha: .5)
+      ..strokeWidth = 1.5;
+    final ring = Paint()
+      ..color = p.ink3
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    final knock = Paint()..color = p.card;
+    var i = 0;
+    while (i < n) {
+      final st = v[i];
+      var j = i;
+      while (j + 1 < n && v[j + 1] == st) {
+        j++;
+      }
+      final x0 = i * w + 3.5, x1 = max((j + 1) * w - 3.5, x0 + .5);
+      cv.drawLine(Offset(x0, yOf(st)), Offset(x1, yOf(st)),
+          Paint()
+            ..color = ink[st]!
+            ..strokeWidth = min(7.0, lane * .45)
+            ..strokeCap = StrokeCap.round);
+      if (j + 1 < n) {
+        final x = (j + 1) * w, nx = yOf(v[j + 1]);
+        cv.drawLine(Offset(x, yOf(st)), Offset(x, nx), change);
+        for (final y in [yOf(st), nx]) {
+          cv.drawCircle(Offset(x, y), 3.2, knock);
+          cv.drawCircle(Offset(x, y), 3.2, ring);
+        }
+      }
+      i = j + 1;
+    }
+  }
+
   @override
   Color get guideLineColor => cols(p)[SleepStage.light]!;
   final List<SleepStage> stages;
@@ -976,6 +1071,7 @@ class Hypnogram extends CustomPainter implements GuidePlot {
   @override
   void paint(Canvas cv, Size s) {
     if (stages.isEmpty || s.width <= 0) return;
+    if (p.metro) return _metro(cv, s);
     // Two per column would overlap at the 2pt visibility floor below.
     final v = columns(stages, (s.width / 2).floor());
     final lane = s.height / 4, w = s.width / v.length;

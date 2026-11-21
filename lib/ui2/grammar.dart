@@ -1904,7 +1904,9 @@ class MetricRow extends StatelessWidget {
     final big = bigText(c);
     final valueText = Text(
       value,
-      style: F.body.copyWith(color: p.ink, fontWeight: FontWeight.w600),
+      style: p.metro
+          ? F.n17.copyWith(color: p.ink)
+          : F.body.copyWith(color: p.ink, fontWeight: FontWeight.w600),
       // At large text the value has a line of its own (see below), and a
       // value that is a WORD ('What applies to you' → a phrase) can still be
       // wider than that line. It wraps there rather than overflowing the row.
@@ -2009,9 +2011,24 @@ class MetricRow extends StatelessWidget {
                   const SizedBox(width: S.x3),
                   Expanded(child: title),
                   const SizedBox(width: S.x2),
+                  // Line: where today sits in its own recent range, drawn in
+                  // place of the arrow when there are enough days to say so.
+                  if (p.metro && RangeMark.of(series) != null) ...[
+                    SizedBox(
+                        width: 84,
+                        height: 14,
+                        child: CustomPaint(
+                            painter: RangeMark(RangeMark.of(series)!,
+                                band: p.on(color).withValues(alpha: .35),
+                                marker: p.ink,
+                                rail: p.line))),
+                    const SizedBox(width: S.x3),
+                  ],
                   amount,
-                  const SizedBox(width: S.x3),
-                  trailing,
+                  if (!(p.metro && RangeMark.of(series) != null)) ...[
+                    const SizedBox(width: S.x3),
+                    trailing,
+                  ],
                 ],
               ),
       ),
@@ -2523,7 +2540,7 @@ class _SubTabsState extends State<SubTabs> {
     final index = widget.index;
     final disabled = widget.disabled;
     final color = widget.color;
-    return SizedBox(
+    final bar = SizedBox(
       height: MediaQuery.textScalerOf(c).scale(S.tap),
       // The fifth tab is off the edge on every phone we ship to — at 360 pt
       // it is entirely off-screen in both tab sets, and above 1.0x text every
@@ -2605,6 +2622,14 @@ class _SubTabsState extends State<SubTabs> {
         ),
       ),
     );
+    // Glass and Line: the sections sit in one track, like an iOS segmented
+    // control, with the active one raised inside it.
+    if (!(p.glass || p.metro)) return bar;
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(color: p.card2, borderRadius: R.rPill),
+      child: bar,
+    );
   }
 }
 
@@ -2625,7 +2650,9 @@ class ScreenTitle extends StatelessWidget {
               title,
               // Line sets titles in its display face, larger and
               // lighter; the other styles keep the system title.
-              style: p.metro
+              style: p.glass
+                  ? F.display.copyWith(color: p.ink, letterSpacing: -.9)
+                  : p.metro
                   ? F.display.copyWith(
                       color: p.ink,
                       fontFamily: LineTok.display,

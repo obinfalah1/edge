@@ -188,7 +188,7 @@ class _AppShellState extends State<AppShell> {
       child: Scaffold(
         backgroundColor: p.bg,
         // The glass pill floats over the content, which scrolls under it.
-        extendBody: glassOf(c),
+        extendBody: glassOf(c) || p.metro,
         body: SafeArea(
           bottom: false,
           child: Column(
@@ -266,55 +266,59 @@ class _InstBar extends StatelessWidget {
 
   const _InstBar({required this.current, required this.onTap});
 
+  /// Line's own tab icons: Today is the day as a line with a stop on it.
+  static IconData _icon(ShellDomain d) => switch (d) {
+        ShellDomain.today => LucideIcons.chartNoAxesGantt,
+        ShellDomain.sleep => LucideIcons.moon,
+        ShellDomain.activity => LucideIcons.activity,
+        ShellDomain.health => LucideIcons.heart,
+      };
+
   @override
   Widget build(BuildContext c) {
     final p = P.of(c);
-    return Container(
-      decoration: BoxDecoration(
-        color: p.card,
-        border: Border(top: BorderSide(color: p.line)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: LayoutBuilder(builder: (c, box) {
-          final w = box.maxWidth / ShellDomain.values.length;
-          const mark = 22.0;
-          return Stack(children: [
-            AnimatedPositioned(
-              duration: motion(c, Motion.slow),
-              curve: Curves.easeOutCubic,
-              left: current.index * w + (w - mark) / 2,
-              top: 0,
-              width: mark,
-              height: 3,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: p.on(p.tint),
-                  borderRadius: const BorderRadius.vertical(
-                      bottom: Radius.circular(R.sm / 4)),
-                ),
-              ),
-            ),
-            IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final d in ShellDomain.values)
-                    Expanded(
-                      child: _Tab(
-                        domain: d,
-                        on: d == current,
-                        onTap: () {
-                          if (d != current) HapticFeedback.selectionClick();
-                          onTap(d);
-                        },
+    // Line: the iOS tab bar. A translucent bar the page scrolls under, a
+    // hairline on top, and the selected tab in gold.
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: p.card.withValues(alpha: .86),
+            border: Border(top: BorderSide(color: p.line, width: .5)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Row(children: [
+              for (final d in ShellDomain.values)
+                Expanded(
+                  child: Semantics(
+                    selected: d == current,
+                    child: Pressable(
+                      semanticLabel: d.title(c),
+                      onTap: () {
+                        if (d != current) HapticFeedback.selectionClick();
+                        onTap(d);
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: S.x2, bottom: S.x1),
+                        child: Column(mainAxisSize: MainAxisSize.min, children: [
+                          Icon(_icon(d),
+                              size: 24,
+                              color: d == current ? p.on(p.tint) : p.ink3),
+                          const SizedBox(height: 2),
+                          Text(d.title(c),
+                              style: F.over.copyWith(
+                                  color: d == current ? p.on(p.tint) : p.ink3,
+                                  fontWeight: FontWeight.w600)),
+                        ]),
                       ),
                     ),
-                ],
-              ),
-            ),
-          ]);
-        }),
+                  ),
+                ),
+            ]),
+          ),
+        ),
       ),
     );
   }

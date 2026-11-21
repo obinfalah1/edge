@@ -1063,9 +1063,10 @@ class _LineScore extends StatelessWidget {
             Text(r.label,
                 style: F.body.copyWith(color: p.ink, fontWeight: FontWeight.w600)),
             const Spacer(),
-            // A reading is a figure; "learning" is a status, set quietly.
-            Text(r.value,
-                style: r.measured
+            // A reading is a figure. While learning, the count of nights is
+            // the figure and "learning" moves under the track.
+            Text(r.calibrating && r.sub.isNotEmpty ? r.sub : r.value,
+                style: r.measured || (r.calibrating && r.sub.isNotEmpty)
                     ? F.n24.copyWith(color: r.provisional ? p.ink3 : p.ink)
                     : F.body.copyWith(color: p.ink2)),
           ]),
@@ -1085,9 +1086,10 @@ class _LineScore extends StatelessWidget {
               ),
             ),
           ),
-          if (r.sub.isNotEmpty) ...[
+          if ((r.calibrating ? r.value : r.sub).isNotEmpty) ...[
             const SizedBox(height: S.x1),
-            Text(r.sub, style: F.cap.copyWith(color: p.ink3)),
+            Text(r.calibrating ? r.value : r.sub,
+                style: F.cap.copyWith(color: p.ink3)),
           ],
         ]),
       ),
@@ -1636,6 +1638,11 @@ class _Dial extends StatelessWidget {
   @override
   Widget build(BuildContext c) {
     final p = P.of(c);
+    // Glass: each ring sits on a faint track of its own colour, learning
+    // beads are full colour, and sleep is one solid arc.
+    final track = p.glass ? p.on(r.color).withValues(alpha: .2) : p.track;
+    final arc = p.glass && r.calibrating && !r.provisional ? p.on(r.color) : r.arc(p);
+    final stages = p.glass ? null : _stageArcs(r, p);
     return Stack(alignment: Alignment.center, children: [
       CustomPaint(
         size: Size.infinite,
@@ -1648,12 +1655,12 @@ class _Dial extends StatelessWidget {
             ? Ring(r.need == null || r.need == 0
                     ? (r.frac ?? 0)
                     : (r.have ?? 0) / r.need!,
-                r.arc(p), p.track,
+                arc, track,
                 stroke: stroke, t: animate(c, 1), background: p.card)
-            : _stageArcs(r, p) != null
-            ? StageRing(_stageArcs(r, p)!, p.track,
+            : stages != null
+            ? StageRing(stages, track,
                 stroke: stroke, t: animate(c, 1), background: p.card)
-            : Ring(r.frac ?? 0, r.arc(p), p.track,
+            : Ring(r.frac ?? 0, arc, track,
                 stroke: stroke,
                 t: animate(c, 1),
                 solid: r.measured,
@@ -1797,7 +1804,10 @@ class _RingText extends StatelessWidget {
         // Absent reads as words, never as a dash and never as a zero, so it
         // takes the sentence weight rather than the numeral one.
         Text(
-          presentationText(AppLocalizations.of(c), r.value),
+          // Glass: "Learning" alone; the line under it says how far along.
+          p.glass && r.calibrating
+              ? 'Learning'
+              : presentationText(AppLocalizations.of(c), r.value),
           style: r.measured
               ? F.n24.copyWith(color: r.provisional ? p.ink3 : p.ink)
               : F.body.copyWith(color: p.ink2),
@@ -2352,6 +2362,16 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
   /// already restricts the arrows to [_days] — so this just re-loads for it.
   /// The day shown, inside the rings card: tap to pick a day; the faint
   /// chevrons say the card swipes, and step a day when tapped too.
+  /// "Sunday" from a `yyyy-mm-dd` day id, or null.
+  static String? _weekdayOf(String? dayId) {
+    final t = dayId == null ? null : DateTime.tryParse(dayId);
+    if (t == null) return null;
+    return const [
+      'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday',
+      'Sunday'
+    ][t.weekday - 1];
+  }
+
   /// Line's Today: the prayers as stations, from the cached times only.
   List<Widget> _metroDay(BuildContext c) {
     final app = c.watch<AppState>();
@@ -2688,6 +2708,31 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
       // exactly the morning you would most want to be told.
       ...?_bodyWatch(c, d, todayLabel(widget.now)),
       // ── greeting ──
+      // Line: the day's name as the title, like a station sign; the date and
+      // the sync under it. The other styles keep the greeting.
+      if (p.metro)
+        Padding(
+          padding: const EdgeInsets.only(top: S.x3, bottom: S.x4),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Expanded(
+              child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(_weekdayOf(d.dayId) ?? g.word,
+                        style: F.display.copyWith(
+                            color: p.ink,
+                            fontFamily: LineTok.display,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: -.9)),
+                    syncedThroughLine(c, d.dayId, l),
+                    if (batteryLine(c) case final battery?) battery,
+                  ]),
+            ),
+            const SizedBox(width: S.x3),
+            const ProfileAvatar(accent: C.domHome),
+          ]),
+        )
+      else
       Padding(
         padding: const EdgeInsets.only(top: S.x3, bottom: S.x5),
         child: Row(children: [
@@ -2700,13 +2745,7 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
                     d.name == null || d.name!.isEmpty
                         ? g.word
                         : '${g.word}, ${d.name}',
-                    style: p.metro
-                        ? F.t1.copyWith(
-                            color: p.ink,
-                            fontFamily: LineTok.display,
-                            fontWeight: FontWeight.w400,
-                            letterSpacing: -.8)
-                        : F.t2.copyWith(color: p.ink),
+                    style: F.t2.copyWith(color: p.ink),
                   ),
                 ),
                 const SizedBox(width: S.x2),
@@ -2794,6 +2833,15 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
         // diagnostic used to go nowhere but a Firebase breadcrumb. It belongs
         // one tap away, on the Readiness screen: a wall of per-input
         // diagnostics on Home makes the app read as broken.
+        if (RingTrio.has(d) && p.metro)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(S.x1, S.x2, S.x1, S.x3),
+            child: Text('Your scores',
+                style: F.t2.copyWith(
+                    color: p.ink,
+                    fontFamily: LineTok.display,
+                    fontWeight: FontWeight.w500)),
+          ),
         if (RingTrio.has(d))
           // Swipe the rings right for the day before, left for the day after.
           DaySwipe(

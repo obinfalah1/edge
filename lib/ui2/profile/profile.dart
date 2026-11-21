@@ -55,8 +55,15 @@ class SetRow extends StatelessWidget {
       this.chevron = true,
       this.trailing,
       this.semanticsValue = '',
+      this.badge,
+      this.badgeOn = true,
       this.onTap})
       : glyph = null;
+
+  /// Line: a station letter in place of the icon (prayer rows). Gold when
+  /// [badgeOn], quiet when off. Other styles keep the icon.
+  final String? badge;
+  final bool badgeOn;
 
   const SetRow.brand(this.glyph, this.color, this.title,
       {super.key,
@@ -67,7 +74,9 @@ class SetRow extends StatelessWidget {
       this.onTap})
       : icon = null,
         trailing = null,
-        semanticsValue = '';
+        semanticsValue = '',
+        badge = null,
+        badgeOn = true;
 
   @override
   Widget build(BuildContext c) {
@@ -87,6 +96,8 @@ class SetRow extends StatelessWidget {
           sub: sub,
           danger: danger,
           chevron: false,
+          badge: badge,
+          badgeOn: value == onWord,
           trailing: ExcludeSemantics(
             child: Switch.adaptive(
               value: value == onWord,
@@ -106,6 +117,21 @@ class SetRow extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: S.x3),
         child: Row(children: [
+          if (p.metro && badge != null)
+            Container(
+              width: 32,
+              height: 32,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                  color: badgeOn ? LineTok.lapis : p.card2,
+                  borderRadius: R.rSm),
+              child: Text(badge!,
+                  style: F.body.copyWith(
+                      color: badgeOn ? LineTok.sign : p.ink3,
+                      fontFamily: LineTok.display,
+                      fontWeight: FontWeight.w600)),
+            )
+          else
           Container(
             width: 32,
             height: 32,
