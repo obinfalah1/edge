@@ -45,7 +45,6 @@ import 'gallery.dart';
 import 'gestures.dart';
 import 'profile.dart';
 import 'report_issue.dart';
-import '../../l10n/personal_text.dart';
 import 'wearable_numbers.dart' show WearableDisplay, wearableSettingsGroup;
 
 /// Unwind the profile stack back to the gate.
@@ -822,16 +821,30 @@ class MoreSettingsView extends StatelessWidget {
                   SetRow(LucideIcons.sun, C.yellow,
                       l?.settingsAppearanceRowTitle ?? 'Appearance',
                       value: appearance, onTap: onCycleAppearance),
-                  // Personal addition: English/Arabic only (tr), not in ARBs.
-                  ValueListenableBuilder<bool>(
-                    valueListenable: GlassLook.enabled,
-                    builder: (c, glass, _) => SetRow(
-                        LucideIcons.droplet, C.blue, 'Liquid Glass',
-                        sub: tr(c, 'Frosted glass cards and tab bar',
-                            'بطاقات وشريط تبويب بمظهر الزجاج'),
-                        value: glass ? on : off,
-                        chevron: false,
-                        onTap: () => GlassLook.set(!glass)),
+                  // Personal additions: the style, and the Liquid Glass colour.
+                  ValueListenableBuilder<EdgeStyle>(
+                    valueListenable: GlassLook.style,
+                    builder: (c, style, _) => SetRow(
+                        LucideIcons.layers, C.indigo, 'Style',
+                        sub: switch (style) {
+                          EdgeStyle.original => 'The app as it first shipped',
+                          EdgeStyle.glass => 'Frosted glass over moving colour',
+                          EdgeStyle.instrument =>
+                            'Solid machined panels and watch-face dials',
+                        },
+                        value: style.label,
+                        onTap: () => GlassLook.set(EdgeStyle.values[
+                            (style.index + 1) % EdgeStyle.values.length])),
+                  ),
+                  ValueListenableBuilder<EdgeStyle>(
+                    valueListenable: GlassLook.style,
+                    builder: (c, style, _) => style != EdgeStyle.glass
+                        ? const SizedBox.shrink()
+                        : ValueListenableBuilder<EdgeTheme>(
+                            valueListenable: EdgeThemes.current,
+                            builder: (c, look, _) => ThemePickerRow(
+                                chosen: look, onPick: EdgeThemes.set),
+                          ),
                   ),
                   SetRow(LucideIcons.clock, C.teal,
                       l?.settingsClockFormatRowTitle ?? 'Time format',

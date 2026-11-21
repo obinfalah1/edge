@@ -86,6 +86,13 @@ class Pressable extends StatefulWidget {
 class _PressableState extends State<Pressable> {
   bool _down = false;
 
+  /// Glass and Instrument panels dim less on press (a deep dim reads as the
+  /// panel fading out) and give a little more.
+  static bool _soft(BuildContext c) {
+    final p = P.of(c);
+    return p.glass || p.inst;
+  }
+
   // The guide run (guides/guide_dim.dart) paints its dim or skeleton INSIDE the
   // component, so it moves with the content in every frame. The mark sits BELOW this
   // control's own Semantics: the first render object of a Pressable (what
@@ -123,12 +130,15 @@ class _PressableState extends State<Pressable> {
         onTapCancel: () => setState(() => _down = false),
         // iOS highlights a pressed control by dimming it; the slight scale
         // stays as the touch-down cue.
+        // On glass a deep dim reads as the card fading out, so glass presses
+        // dim less and give a little more, springing back on release.
         child: AnimatedOpacity(
-          opacity: _down ? .62 : 1,
+          opacity: _down ? (_soft(c) ? .82 : .62) : 1,
           duration: motion(c, Motion.fast),
           child: AnimatedScale(
-            scale: _down ? .975 : 1,
-            duration: motion(c, Motion.fast),
+            scale: _down ? (_soft(c) ? .965 : .975) : 1,
+            duration: motion(c, _down ? Motion.fast : Motion.slow),
+            curve: _down ? Curves.easeOut : Curves.easeOutBack,
             child: out,
           ),
         ),
@@ -709,18 +719,40 @@ class Surface extends StatelessWidget {
     return Pressable(
       onTap: onTap,
       semanticLabel: semanticLabel,
-      child: GuideUnitMark(component: c, child: glassOf(c) && color == null
-          // Liquid Glass: frosted fill, top highlight and a bright rim.
+      child: GuideUnitMark(component: c, child: p.glass
+          // Liquid Glass: frosted fill, top highlight and a bright rim. A
+          // card that asked for a colour gets it as a tint over the glass.
           ? CustomPaint(
-              foregroundPainter: GlassRim(p.dark),
+              foregroundPainter:
+                  GlassRim(p.dark, radius: p.cardRadius, prism: p.prism),
               child: Container(
                 width: double.infinity,
                 padding: pad,
-                decoration: glassDecoration(p, shadow: p.el(elevation)),
+                decoration: glassDecoration(p,
+                    shadow: p.el(elevation),
+                    tint: isPlainCard(p, color) ? null : color),
                 child: child,
               ),
             )
-          : Container(
+          : p.inst
+              // Instrument: a solid machined plate. A requested colour is a
+              // tint laid into the plate, never a different material.
+              ? CustomPaint(
+                  foregroundPainter: InstEdge(p),
+                  child: Container(
+                    width: double.infinity,
+                    padding: pad,
+                    decoration: BoxDecoration(
+                      color: isPlainCard(p, color)
+                          ? p.card
+                          : Color.alphaBlend(color!, p.card),
+                      borderRadius: p.cardRadius,
+                      boxShadow: p.dark ? const [] : p.el(elevation),
+                    ),
+                    child: child,
+                  ),
+                )
+              : Container(
               width: double.infinity,
               padding: pad,
               decoration: BoxDecoration(
@@ -2571,7 +2603,11 @@ class ScreenTitle extends StatelessWidget {
           Expanded(
             child: Text(
               title,
-              style: F.t1.copyWith(color: p.ink),
+              // Instrument sets titles larger and tighter, like the face of
+              // a dial; the other styles keep the system title.
+              style: p.inst
+                  ? F.display.copyWith(color: p.ink, letterSpacing: -1.1)
+                  : F.t1.copyWith(color: p.ink),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),

@@ -1,5 +1,8 @@
-// The dark Liquid Glass background: slow, drifting fields of deep colour
-// behind every page, so the glass cards have something to sit over.
+// The Liquid Glass background: slow, drifting fields of colour behind every
+// page, so the glass cards have something to sit over. The colours come from
+// the chosen look and tone (EdgeTheme / Sky in theme.dart): Fajr follows the
+// sky outside by the clock and shows stars at night; Prism slowly turns its
+// colours through one another like light through a prism.
 //
 // One per route (painted under the page by the theme's page transition, see
 // `_Gated` in theme.dart), all reading the same wall clock so a push or pop
@@ -55,47 +58,77 @@ class _MovingBackdropState extends State<MovingBackdrop>
   Widget build(BuildContext c) => Stack(fit: StackFit.passthrough, children: [
         Positioned.fill(
           child: RepaintBoundary(
-            child: CustomPaint(painter: _Fields(_t)),
+            child: CustomPaint(painter: _Fields(_t, P.of(c))),
           ),
         ),
         widget.child,
       ]);
 }
 
-/// Four deep colour fields on slow, unrelated orbits over black.
+/// Four colour fields on slow, unrelated orbits over the look's base.
 class _Fields extends CustomPainter implements GuideDecoration {
   final ValueNotifier<double> t;
-  _Fields(this.t) : super(repaint: t);
+  final P p;
+  _Fields(this.t, this.p) : super(repaint: t);
 
-  static final _fields = <(Color, double, double, double, double)>[
-    // colour, x-speed, y-speed, phase, size (fraction of the long side)
-    (GlassTok.fields[0], .021, .017, 0.0, .75),
-    (GlassTok.fields[1], .016, .023, 1.7, .70),
-    (GlassTok.fields[2], .019, .013, 3.1, .65),
-    (GlassTok.fields[3], .013, .019, 4.6, .70),
+  static const _orbits = <(double, double, double, double)>[
+    // x-speed, y-speed, phase, size (fraction of the long side)
+    (.021, .017, 0.0, .75),
+    (.016, .023, 1.7, .70),
+    (.019, .013, 3.1, .65),
+    (.013, .019, 4.6, .70),
   ];
 
   @override
   void paint(Canvas canvas, Size size) {
     final rect = Offset.zero & size;
-    canvas.drawRect(rect, Paint()..color = GlassTok.night);
+    final sky = skyFor(p.look, p.tone);
+    canvas.drawRect(rect, Paint()..color = sky.base);
     final long = math.max(size.width, size.height);
     final s = t.value;
-    for (final (colour, sx, sy, ph, k) in _fields) {
+    // Prism: each field drifts toward the next colour and back, one full turn
+    // every two minutes or so.
+    final turn = p.look == EdgeTheme.prism
+        ? .5 + .5 * math.sin(s * 2 * math.pi / 130)
+        : 0.0;
+    for (var i = 0; i < _orbits.length; i++) {
+      final (sx, sy, ph, k) = _orbits[i];
+      final colour =
+          Color.lerp(sky.fields[i], sky.fields[(i + 1) % 4], turn)!;
       final cx = size.width * (.5 + .45 * math.sin(s * sx * 2 * math.pi + ph));
       final cy = size.height * (.5 + .45 * math.cos(s * sy * 2 * math.pi + ph * 1.3));
       final r = long * k;
       canvas.drawRect(
         rect,
         Paint()
-          // Dark fields over black: they layer, but never add up to bright.
+          // Fields layer, but never add up past the colour itself.
           ..shader = RadialGradient(
-            colors: [colour.withValues(alpha: .7), colour.withValues(alpha: 0)],
+            colors: [
+              colour.withValues(alpha: MovingFields.alpha),
+              colour.withValues(alpha: 0),
+            ],
           ).createShader(Rect.fromCircle(center: Offset(cx, cy), radius: r)),
       );
+    }
+    if (sky.stars > 0 && p.tone != EdgeTone.light) _stars(canvas, size, sky.stars, s);
+  }
+
+  /// A fixed sky of small stars in the top half, each twinkling slowly.
+  void _stars(Canvas canvas, Size size, double amount, double s) {
+    final rnd = math.Random(7);
+    final paint = Paint();
+    for (var i = 0; i < 46; i++) {
+      final x = rnd.nextDouble() * size.width;
+      final y = rnd.nextDouble() * size.height * .55;
+      final r = .5 + rnd.nextDouble() * 1.1;
+      final tw = .55 + .45 * math.sin(s * (.4 + rnd.nextDouble() * .8) + i);
+      paint.color = MovingFields.star
+          .withValues(alpha: (.18 + .5 * tw) * amount * (1 - y / size.height));
+      canvas.drawCircle(Offset(x, y), r, paint);
     }
   }
 
   @override
-  bool shouldRepaint(_Fields old) => false;
+  bool shouldRepaint(_Fields old) =>
+      old.p.look != p.look || old.p.tone != p.tone;
 }

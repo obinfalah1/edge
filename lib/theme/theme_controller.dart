@@ -17,18 +17,19 @@ import 'tokens.dart';
 import 'theme.dart';
 
 /// What the user picked. `system` defers to the OS brightness.
-enum AppThemeChoice { system, light, dark }
+enum AppThemeChoice { system, light, mid, dark }
 
 extension AppThemeChoiceLabel on AppThemeChoice {
   String get label => switch (this) {
         AppThemeChoice.system => 'System',
         AppThemeChoice.light => 'Light',
+        AppThemeChoice.mid => 'Mid',
         AppThemeChoice.dark => 'Dark',
       };
 }
 
 class ThemeController extends ChangeNotifier {
-  static const String _kChoice = 'theme_choice'; // 'system' | 'light' | 'dark'
+  static const String _kChoice = 'theme_choice'; // 'system' | 'light' | 'mid' | 'dark'
 
   AppThemeChoice _choice;
   Brightness _platform;
@@ -56,6 +57,7 @@ class ThemeController extends ChangeNotifier {
 
   static AppThemeChoice _parse(String? s) => switch (s) {
         'light' => AppThemeChoice.light,
+        'mid' => AppThemeChoice.mid,
         'dark' => AppThemeChoice.dark,
         _ => AppThemeChoice.system,
       };
@@ -65,11 +67,16 @@ class ThemeController extends ChangeNotifier {
   /// The brightness actually being rendered.
   Brightness get effective => switch (_choice) {
         AppThemeChoice.light => Brightness.light,
+        // Mid is light ink on a mid-tone page: a dark theme, lifted.
+        AppThemeChoice.mid => Brightness.dark,
         AppThemeChoice.dark => Brightness.dark,
         AppThemeChoice.system => _platform,
       };
 
   bool get isDark => effective == Brightness.dark;
+
+  /// The Mid tone (see [AppThemeChoice.mid]).
+  bool get isMid => _choice == AppThemeChoice.mid;
 
   /// We resolve `system` ourselves and hand MaterialApp an explicit mode, so the
   /// rendered brightness can never drift from [AppColors.active].

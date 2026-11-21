@@ -297,6 +297,7 @@ Map<String, Widget> componentCases() => {
       'moving_backdrop': const SizedBox(
           height: 160,
           child: MovingBackdrop(child: SizedBox.expand())),
+      'theme_picker': ThemePickerRow(chosen: EdgeTheme.prism, onPick: (_) {}),
       'pill_row': const Wrap(spacing: S.x2, runSpacing: S.x2, children: [
         Pill('Estimated', C.yellow, icon: LucideIcons.circleDashed),
         Pill('Relative', C.purple),

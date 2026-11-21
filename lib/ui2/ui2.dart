@@ -16,6 +16,8 @@ export 'paint_activity.dart';
 export 'pickers.dart';
 export 'moving_backdrop.dart';
 export 'glass_look.dart';
+export 'edge_themes.dart';
+export 'theme_picker.dart';
 export 'revision.dart';
 export 'scroll_hint.dart';
 export 'sleep_ring_model.dart';

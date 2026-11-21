@@ -642,6 +642,34 @@ class Ring extends CustomPainter implements GuideRing {
       o.background != background;
 }
 
+/// Instrument's dial face: sixty fine graduations inside a ring, every fifth
+/// one longer, like the chapter ring of a watch.
+class DialTicks extends CustomPainter implements GuideDecoration {
+  final Color color;
+  final double stroke;
+  const DialTicks(this.color, {required this.stroke});
+
+  @override
+  void paint(Canvas cv, Size s) {
+    final c = s.center(Offset.zero);
+    final outer = min(s.width, s.height) / 2 - stroke - 3;
+    final paint = Paint()
+      ..color = color
+      ..strokeCap = StrokeCap.round;
+    for (var i = 0; i < 60; i++) {
+      final major = i % 5 == 0;
+      final a = i / 60 * 2 * pi - pi / 2;
+      final len = major ? 5.0 : 2.5;
+      paint.strokeWidth = major ? 1.2 : .8;
+      final d = Offset(cos(a), sin(a));
+      cv.drawLine(c + d * outer, c + d * (outer - len), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(DialTicks o) => o.color != color || o.stroke != stroke;
+}
+
 /// One coloured arc of a [StageRing]: [fraction] of the FULL circle.
 class RingArc {
   final Color color;

@@ -1573,6 +1573,11 @@ class _Dial extends StatelessWidget {
                 solid: r.measured,
                 background: p.card),
       ),
+      // Instrument: the dial's graduations, under the icon.
+      if (p.inst)
+        CustomPaint(
+            size: Size.infinite,
+            painter: DialTicks(p.ink3.withValues(alpha: .45), stroke: stroke)),
       Icon(r.icon, size: icon, color: r.ink(p)),
     ]);
   }

@@ -14,6 +14,7 @@
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../l10n/app_localizations.dart';
@@ -212,7 +213,9 @@ class _AppShellState extends State<AppShell> {
         ),
         bottomNavigationBar: glassOf(c)
             ? _GlassPillBar(current: _current, onTap: _select)
-            : _TabBar(current: _current, onTap: _select),
+            : p.inst
+                ? _InstBar(current: _current, onTap: _select)
+                : _TabBar(current: _current, onTap: _select),
       ),
     );
   }
@@ -254,6 +257,69 @@ class _TabBar extends StatelessWidget {
   }
 }
 
+/// Instrument's tab bar: a solid docked plate with a hairline above it. The
+/// selected tab is marked by a short lapis index at the top edge that slides
+/// to the tab you pick, like the pointer on a scale.
+class _InstBar extends StatelessWidget {
+  final ShellDomain current;
+  final ValueChanged<ShellDomain> onTap;
+
+  const _InstBar({required this.current, required this.onTap});
+
+  @override
+  Widget build(BuildContext c) {
+    final p = P.of(c);
+    return Container(
+      decoration: BoxDecoration(
+        color: p.card,
+        border: Border(top: BorderSide(color: p.line)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: LayoutBuilder(builder: (c, box) {
+          final w = box.maxWidth / ShellDomain.values.length;
+          const mark = 22.0;
+          return Stack(children: [
+            AnimatedPositioned(
+              duration: motion(c, Motion.slow),
+              curve: Curves.easeOutCubic,
+              left: current.index * w + (w - mark) / 2,
+              top: 0,
+              width: mark,
+              height: 3,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: p.on(p.tint),
+                  borderRadius: const BorderRadius.vertical(
+                      bottom: Radius.circular(R.sm / 4)),
+                ),
+              ),
+            ),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (final d in ShellDomain.values)
+                    Expanded(
+                      child: _Tab(
+                        domain: d,
+                        on: d == current,
+                        onTap: () {
+                          if (d != current) HapticFeedback.selectionClick();
+                          onTap(d);
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ]);
+        }),
+      ),
+    );
+  }
+}
+
 /// Liquid Glass tab bar: a floating capsule that blurs what scrolls under it,
 /// with a translucent fill, a bright rim and the selected tab in a lens.
 class _GlassPillBar extends StatelessWidget {
@@ -288,7 +354,7 @@ class _GlassPillBar extends StatelessWidget {
           borderRadius: radius,
           child: BackdropFilter(
             // Light blur, like Apple's: what is behind stays readable and colourful.
-            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
             child: CustomPaint(
               foregroundPainter: GlassRim(p.dark, radius: radius),
               child: Container(
@@ -305,17 +371,54 @@ class _GlassPillBar extends StatelessWidget {
                         : GlassTok.pillLight,
                   ),
                 ),
-                child: Row(children: [
-                  for (final d in ShellDomain.values)
-                    Expanded(
-                      child: _Tab(
-                        domain: d,
-                        on: d == current,
-                        onTap: () => onTap(d),
-                        lens: true,
+                // One lens for the whole bar that slides (with a little
+                // overshoot, like liquid) to the tab you pick.
+                child: LayoutBuilder(builder: (c, box) {
+                  final n = ShellDomain.values.length;
+                  final w = box.maxWidth / n;
+                  const lensRadius = BorderRadius.all(Radius.circular(28));
+                  return Stack(children: [
+                    AnimatedPositioned(
+                      duration: motion(c, Motion.slow),
+                      curve: Curves.easeOutBack,
+                      left: current.index * w + 2,
+                      width: w - 4,
+                      top: 0,
+                      bottom: 0,
+                      child: CustomPaint(
+                        foregroundPainter: GlassRim(p.dark,
+                            radius: lensRadius, prism: p.prism),
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: lensRadius,
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                p.dark ? GlassTok.lensDark : GlassTok.lensLight,
+                                p.wash(p.tint),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                ]),
+                    Row(children: [
+                      for (final d in ShellDomain.values)
+                        Expanded(
+                          child: _Tab(
+                            domain: d,
+                            on: d == current,
+                            onTap: () {
+                              if (d != current) HapticFeedback.selectionClick();
+                              onTap(d);
+                            },
+                            lens: true,
+                          ),
+                        ),
+                    ]),
+                  ]);
+                }),
               ),
             ),
           ),
@@ -344,7 +447,10 @@ class _Tab extends StatelessWidget {
   Widget build(BuildContext c) {
     final p = P.of(c);
     // iOS 26: unselected items in the label colour, the selected one tinted.
-    final ink = on ? p.on(domain.accent) : (lens ? p.ink : p.ink3);
+    // Under glass the selected tab takes the theme's tint.
+    final ink = on
+        ? p.on(lens || p.inst ? p.tint : domain.accent)
+        : (lens ? p.ink : p.ink3);
     // On the clear glass bar, a soft halo keeps icons and labels readable
     // over whatever scrolls beneath (Apple does this with vibrancy).
     final halo = lens
@@ -368,14 +474,8 @@ class _Tab extends StatelessWidget {
           margin: lens ? const EdgeInsets.symmetric(horizontal: 2) : null,
           padding: EdgeInsets.symmetric(vertical: lens ? 5 : 6, horizontal: 2),
           // The selected tab's own soft capsule, as in Apple's iOS 26 bars.
-          decoration: lens && on
-              ? BoxDecoration(
-                  borderRadius: const BorderRadius.all(Radius.circular(28)),
-                  color: p.dark
-                      ? GlassTok.lensDark
-                      : GlassTok.lensLight,
-                )
-              : null,
+          // The lens is drawn once by the bar and slides between tabs.
+          decoration: null,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -386,7 +486,7 @@ class _Tab extends StatelessWidget {
                 vertical: S.x1,
               ),
               decoration: BoxDecoration(
-                color: on && !lens
+                color: on && !lens && !p.inst
                     ? p.wash(domain.accent)
                     : const Color(0x00000000),
                 borderRadius: R.rPill,

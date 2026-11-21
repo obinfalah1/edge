@@ -213,4 +213,60 @@ void main() {
       expect(Motion.enabled(on), isTrue);
     });
   });
+
+  group('instrument: ink and accents clear AA', () {
+    for (final tone in EdgeTone.values) {
+      final p = P(tone != EdgeTone.light, inst: true, mid: tone == EdgeTone.mid);
+      test('instrument · ${tone.name}', () {
+        for (final (ik, iv) in [('ink', p.ink), ('ink2', p.ink2), ('ink3', p.ink3)]) {
+          for (final (sk, sv) in [('page', p.bgSolid), ('card', p.card), ('card2', p.card2)]) {
+            final r = P.contrast(iv, sv);
+            expect(r, greaterThanOrEqualTo(_aa), reason: '$ik ${r.toStringAsFixed(2)}:1 on $sk');
+          }
+        }
+        for (final accent in [...C.all, InstTok.lapis]) {
+          for (final sv in [p.bgSolid, p.card, p.card2]) {
+            final r = P.contrast(p.on(accent), sv);
+            expect(r, greaterThanOrEqualTo(_aa),
+                reason: '#${accent.toARGB32().toRadixString(16)} ${r.toStringAsFixed(2)}:1');
+          }
+        }
+      });
+    }
+  });
+
+  // Liquid Glass: cards are translucent, so text is measured against what it
+  // really sits on: the card over the backdrop's worst field, and the bare
+  // backdrop for page text, in every look and tone (Fajr over the whole day).
+  group('glass looks: ink and accents clear AA', () {
+    for (final look in EdgeTheme.values) {
+      for (final tone in EdgeTone.values) {
+        final p = P(tone != EdgeTone.light,
+            glass: true, mid: tone == EdgeTone.mid, look: look);
+        final worst = skyExtreme(look, tone, lightest: p.dark);
+        final surfaces = {
+          'page': worst,
+          'card': Color.alphaBlend(p.card, worst),
+          'sheen': Color.alphaBlend(p.glassTop, worst),
+          'card2': Color.alphaBlend(p.card2, worst),
+        };
+        test('${look.name} · ${tone.name} · ink', () {
+          for (final (ik, iv) in [('ink', p.ink), ('ink2', p.ink2), ('ink3', p.ink3)]) {
+            surfaces.forEach((sk, sv) {
+              final r = P.contrast(iv, sv);
+              expect(r, greaterThanOrEqualTo(_aa),
+                  reason: '$ik ${r.toStringAsFixed(2)}:1 on $sk');
+            });
+          }
+        });
+        test('${look.name} · ${tone.name} · accents', () {
+          for (final accent in [...C.all, for (final t in EdgeTheme.values) t.tint]) {
+            final r = P.contrast(p.on(accent), p.floor);
+            expect(r, greaterThanOrEqualTo(_aa),
+                reason: '#${accent.toARGB32().toRadixString(16)} ${r.toStringAsFixed(2)}:1');
+          }
+        });
+      }
+    }
+  });
 }
