@@ -103,8 +103,6 @@ class ImportSummary extends MapView<String, int> {
 /// table complete. Keys in [kPrefsNotBackedUp] need no entry.
 const Map<String, String> kPrefTypes = {
   'fajr_alarm_buzz_count': 'int',
-  'edge6_glass': 'bool',
-  'edge6_ui': 'bool',
   'fajr_alarm_enabled': 'bool',
   'fajr_alarm_pause_steps': 'int',
   'fajr_alarm_offset_min': 'int',

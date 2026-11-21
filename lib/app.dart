@@ -44,8 +44,6 @@ import 'ui2/screens/wellness_screen.dart';
 import 'ui2/screens/workout_screen.dart';
 import 'ui2/ui2.dart';
 import 'ui2/guides/guide_runner.dart';
-import 'edge6/e6.dart' show E6Prefs;
-import 'edge6/e6_shell.dart' show E6Shell;
 import 'ui2/profile/settings.dart' show MoreSettings;
 import 'ui2/guides/guide_dim.dart';
 import 'ui2/skeleton/unit_paint.dart' show GuideScrollBehavior;
@@ -697,9 +695,6 @@ class _ShellState extends State<AppMainShell> implements GuideShellLink {
     // SELECT, not watch: a bool that flips twice a workout, not the ~1 Hz
     // AppState tick.
     final live = context.select<AppState, bool>((a) => a.activeWorkout != null);
-    // Edge v6 UI (WHOOP-style dials, Classic or Liquid Glass). The original
-    // shell stays one switch away in More, and is what tests mount.
-    if (E6Prefs.on) return const E6Shell();
     return AppShell(
       initial: _domain,
       selection: _selection,

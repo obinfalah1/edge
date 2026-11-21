@@ -19,25 +19,31 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 /// The icons compiled into the iOS asset catalog. The wire names are the
-/// `.appiconset` names — `null` is the primary icon, the plain Orbit.
+/// `.appiconset` names — `null` is the primary icon, the plain Orbit. The
+/// original colourful and black-and-white icons stay pickable.
 enum AppIconChoice {
   orbit(null, 'Orbit'),
   orbitGlass('AppIconGlass', 'Orbit Glass'),
-  orbitTinted('AppIconTinted', 'Orbit Tinted');
+  orbitTinted('AppIconTinted', 'Orbit Tinted'),
+  colourful('AppIconColourful', 'Colourful'),
+  blackAndWhite('AppIconBW', 'Black and white');
 
   const AppIconChoice(this.wireName, this.label);
 
+  /// The alternate-icon name iOS knows it by; null for the primary icon.
   final String? wireName;
   final String label;
 
+  /// The bundled preview of this icon, drawn in the settings row.
   String get asset => switch (this) {
-    AppIconChoice.orbit => 'assets/images/icon_orbit.png',
-    AppIconChoice.orbitGlass => 'assets/images/icon_orbit_glass.png',
-    AppIconChoice.orbitTinted => 'assets/images/icon_orbit_tinted.png',
-  };
+        AppIconChoice.orbit => 'assets/images/icon_orbit.png',
+        AppIconChoice.orbitGlass => 'assets/images/icon_orbit_glass.png',
+        AppIconChoice.orbitTinted => 'assets/images/icon_orbit_tinted.png',
+        AppIconChoice.colourful => 'assets/images/icon.png',
+        AppIconChoice.blackAndWhite => 'assets/images/icon_bw.png',
+      };
 
-  /// An icon iOS reports that is not one of these (the older black-and-white
-  /// one) reads as the main icon, so picking one always moves off it.
+  /// An unknown name reads as the main icon, so picking one always moves off it.
   static AppIconChoice fromWireName(String? name) => AppIconChoice.values
       .firstWhere((c) => c.wireName == name, orElse: () => AppIconChoice.orbit);
 }
@@ -64,8 +70,7 @@ class AppIcon {
     }
     try {
       return AppIconChoice.fromWireName(
-        await _ch.invokeMethod<String>('current'),
-      );
+          await _ch.invokeMethod<String>('current'));
     } catch (e) {
       debugPrint('[app_icon] current failed: $e');
       return AppIconChoice.orbit;

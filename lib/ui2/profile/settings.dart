@@ -275,7 +275,7 @@ class _MoreSettingsState extends State<MoreSettings>
 /// looking rather than by reading a word.
 ///
 /// Not a [SetRow]: a cycling value row would flip the icon on every tap, and
-/// each flip on iOS is a system confirmation alert. Two targets, one tap, no
+/// each flip on iOS is a system confirmation alert. One target per icon, one tap, no
 /// wrong taps to undo.
 class _IconRow extends StatelessWidget {
   final AppIconChoice chosen;
@@ -287,37 +287,47 @@ class _IconRow extends StatelessWidget {
   Widget build(BuildContext c) {
     final p = P.of(c);
     final l = AppLocalizations.of(c);
+    // Five icons do not fit beside the title on a 375 pt phone, so the
+    // choices sit on their own line under it and wrap if text is enlarged.
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: S.x3),
-      child: Row(children: [
-        Container(
-          width: 32,
-          height: 32,
-          alignment: Alignment.center,
-          decoration:
-              BoxDecoration(color: p.wash(C.indigo), borderRadius: R.rSm),
-          child: Icon(LucideIcons.image, size: 16, color: p.on(C.indigo)),
-        ),
-        const SizedBox(width: S.x3),
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(l?.settingsIconRowTitle ?? 'Icon',
-                style: F.body.copyWith(color: p.ink)),
-            // The cost, stated where the choice is made. iOS shows its own
-            // alert on every change and there is no way to turn that off.
-            Text(l?.settingsIconRowConfirmHint ?? 'iPhone will ask you to confirm',
-                style: F.over.copyWith(color: p.ink3)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 32,
+            height: 32,
+            alignment: Alignment.center,
+            decoration:
+                BoxDecoration(color: p.wash(C.indigo), borderRadius: R.rSm),
+            child: Icon(LucideIcons.image, size: 16, color: p.on(C.indigo)),
+          ),
+          const SizedBox(width: S.x3),
+          Expanded(
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(l?.settingsIconRowTitle ?? 'Icon',
+                  style: F.body.copyWith(color: p.ink)),
+              // The cost, stated where the choice is made. iOS shows its own
+              // alert on every change and there is no way to turn that off.
+              Text(
+                  l?.settingsIconRowConfirmHint ??
+                      'iPhone will ask you to confirm',
+                  style: F.over.copyWith(color: p.ink3)),
+            ]),
+          ),
+        ]),
+        const SizedBox(height: S.x3),
+        Padding(
+          padding: const EdgeInsetsDirectional.only(start: 32 + S.x3),
+          child: Wrap(spacing: S.x2, runSpacing: S.x2, children: [
+            for (final choice in AppIconChoice.values)
+              _IconChoice(
+                choice: choice,
+                selected: choice == chosen,
+                onTap: onPick == null ? null : () => onPick!(choice),
+              ),
           ]),
         ),
-        const SizedBox(width: S.x2),
-        for (final choice in AppIconChoice.values) ...[
-          if (choice != AppIconChoice.values.first) const SizedBox(width: S.x2),
-          _IconChoice(
-            choice: choice,
-            selected: choice == chosen,
-            onTap: onPick == null ? null : () => onPick!(choice),
-          ),
-        ],
       ]),
     );
   }

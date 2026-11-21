@@ -21,7 +21,6 @@ import 'telemetry/firebase_bridge.dart';
 import 'package:workmanager/workmanager.dart';
 import 'dart:async';
 import 'dart:io';
-import 'edge6/e6.dart' show E6Prefs;
 import 'compute/background_derivation.dart' show kHeavyDeriveTaskName, kSyncTaskName;
 
 /// Ceiling on every pre-runApp platform-channel await. Each one is guarded
@@ -194,14 +193,6 @@ Future<void> main() async {
               debugPrint('[main] CoachConfig.load failed/timed out: $e'),
         ),
   );
-
-  // Edge v6 look (Classic or Liquid Glass): a SharedPreferences read, bounded
-  // like the other pre-runApp awaits so a slow store never blocks launch.
-  try {
-    await E6Prefs.load().timeout(const Duration(seconds: 3));
-  } catch (e) {
-    debugPrint('[main] E6Prefs.load failed: $e');
-  }
 
   runApp(
     MultiProvider(
