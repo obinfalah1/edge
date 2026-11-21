@@ -945,6 +945,7 @@ class _CoachSetupState extends State<CoachSetup> {
   /// switch moves; while on, the other provider fields are hidden.
   late bool _apple;
   AppleAiStatus? _appleStatus;
+  String? _appleMsg;
   late final ChatGptAuth _chatgptAuth; // for dispose, which must not read context
   bool _signingIn = false;
   /// The model Save will store when nothing has been typed: the saved one at
@@ -1415,11 +1416,17 @@ class _CoachSetupState extends State<CoachSetup> {
             value: _apple,
             onChanged: (on) async {
               if (on && st != null && !ready) {
-                setState(() => _msg = st.text(isArabic(context)));
+                setState(() => _appleMsg = st.text(isArabic(context)));
                 return;
               }
               await context.read<CoachConfig>().save(useApple: on);
-              if (mounted) setState(() => _apple = on);
+              if (mounted) {
+                setState(() {
+                  _apple = on;
+                  _appleMsg = null;
+                  _msg = null;
+                });
+              }
             },
           ),
         ]),
@@ -1435,9 +1442,9 @@ class _CoachSetupState extends State<CoachSetup> {
               tr(c, 'The coach, briefings and journal now use Apple’s small on-device model. It answers from your last two weeks and can’t log things for you; switch it off to use a bigger model instead.', 'يستخدم المدرب والملخصات واليوميات الآن نموذج Apple الصغير على الجهاز. يجيب من بيانات آخر أسبوعين ولا يستطيع التسجيل نيابةً عنك؛ أوقفه لاستخدام نموذج أكبر.'),
               style: F.cap.copyWith(color: p.ink3)),
         ],
-        if (_apple && _msg != null) ...[
+        if (_appleMsg != null) ...[
           const SizedBox(height: S.x2),
-          Text(_msg!, style: F.cap.copyWith(color: p.on(C.red))),
+          Text(_appleMsg!, style: F.cap.copyWith(color: p.on(C.red))),
         ],
       ]),
     );
@@ -1568,6 +1575,8 @@ class _CoachSetupState extends State<CoachSetup> {
                       style: F.cap.copyWith(color: p.ink3, height: 1.5),
                     ),
                   ],
+                  // Apple on-device needs no endpoint, model list or Save.
+                  if (!_apple) ...[
                   const SizedBox(height: S.x4),
                   BigButton(
                     _loading ? (l?.coachAsking ?? 'Asking…') : (l?.coachListModels ?? 'List models'),
@@ -1662,6 +1671,7 @@ class _CoachSetupState extends State<CoachSetup> {
                     color: kCoachAccent,
                     onTap: _save,
                   ),
+                  ], // end of the bring-your-own-model fields
                 ],
               ),
             ),
