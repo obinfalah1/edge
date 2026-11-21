@@ -69,7 +69,7 @@ class _HealthspanScreenState extends State<HealthspanScreen> {
     HealthspanResult window(int from, int to) {
       List<double> pick(Map<String, double> m) => [
             for (var b = from; b < to; b++)
-              if (m[day(b)] case final v?) v,
+              ?m[day(b)],
           ];
       return Healthspan.compute(
         age: age,
