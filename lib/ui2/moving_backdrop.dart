@@ -1,8 +1,6 @@
 // The Liquid Glass background: slow, drifting fields of colour behind every
 // page, so the glass cards have something to sit over. The colours come from
-// the chosen look and tone (EdgeTheme / Sky in theme.dart): Fajr follows the
-// sky outside by the clock and shows stars at night; Prism slowly turns its
-// colours through one another like light through a prism.
+// the tone (Sky in theme.dart).
 //
 // One per route (painted under the page by the theme's page transition, see
 // `_Gated` in theme.dart), all reading the same wall clock so a push or pop
@@ -86,15 +84,9 @@ class _Fields extends CustomPainter implements GuideDecoration {
     canvas.drawRect(rect, Paint()..color = sky.base);
     final long = math.max(size.width, size.height);
     final s = t.value;
-    // Prism: each field drifts toward the next colour and back, one full turn
-    // every two minutes or so.
-    final turn = p.look == EdgeTheme.prism
-        ? .5 + .5 * math.sin(s * 2 * math.pi / 130)
-        : 0.0;
     for (var i = 0; i < _orbits.length; i++) {
       final (sx, sy, ph, k) = _orbits[i];
-      final colour =
-          Color.lerp(sky.fields[i], sky.fields[(i + 1) % 4], turn)!;
+      final colour = sky.fields[i];
       final cx = size.width * (.5 + .45 * math.sin(s * sx * 2 * math.pi + ph));
       final cy = size.height * (.5 + .45 * math.cos(s * sy * 2 * math.pi + ph * 1.3));
       final r = long * k;
@@ -109,22 +101,6 @@ class _Fields extends CustomPainter implements GuideDecoration {
             ],
           ).createShader(Rect.fromCircle(center: Offset(cx, cy), radius: r)),
       );
-    }
-    if (sky.stars > 0 && p.tone != EdgeTone.light) _stars(canvas, size, sky.stars, s);
-  }
-
-  /// A fixed sky of small stars in the top half, each twinkling slowly.
-  void _stars(Canvas canvas, Size size, double amount, double s) {
-    final rnd = math.Random(7);
-    final paint = Paint();
-    for (var i = 0; i < 46; i++) {
-      final x = rnd.nextDouble() * size.width;
-      final y = rnd.nextDouble() * size.height * .55;
-      final r = .5 + rnd.nextDouble() * 1.1;
-      final tw = .55 + .45 * math.sin(s * (.4 + rnd.nextDouble() * .8) + i);
-      paint.color = MovingFields.star
-          .withValues(alpha: (.18 + .5 * tw) * amount * (1 - y / size.height));
-      canvas.drawCircle(Offset(x, y), r, paint);
     }
   }
 

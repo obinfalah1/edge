@@ -86,11 +86,11 @@ class Pressable extends StatefulWidget {
 class _PressableState extends State<Pressable> {
   bool _down = false;
 
-  /// Glass and Instrument panels dim less on press (a deep dim reads as the
+  /// Glass and Line cards dim less on press (a deep dim reads as the
   /// panel fading out) and give a little more.
   static bool _soft(BuildContext c) {
     final p = P.of(c);
-    return p.glass || p.inst;
+    return p.glass || p.metro;
   }
 
   // The guide run (guides/guide_dim.dart) paints its dim or skeleton INSIDE the
@@ -709,7 +709,12 @@ class Surface extends StatelessWidget {
     this.color,
     this.elevation = 1,
     this.semanticLabel,
+    this.open = false,
   });
+
+  /// Line draws this one without a card: it sits straight on the page
+  /// (the rings, the figures of a grid). Other styles ignore it.
+  final bool open;
 
   // The guide mark is INSIDE the Pressable (around the card), never outside it: the
   // Surface's first render object stays the Pressable's semantics node, as before guides.
@@ -724,7 +729,7 @@ class Surface extends StatelessWidget {
           // card that asked for a colour gets it as a tint over the glass.
           ? CustomPaint(
               foregroundPainter:
-                  GlassRim(p.dark, radius: p.cardRadius, prism: p.prism),
+                  GlassRim(p.dark, radius: p.cardRadius),
               child: Container(
                 width: double.infinity,
                 padding: pad,
@@ -734,11 +739,13 @@ class Surface extends StatelessWidget {
                 child: child,
               ),
             )
-          : p.inst
-              // Instrument: a solid machined plate. A requested colour is a
-              // tint laid into the plate, never a different material.
+          : p.metro && open
+              ? Container(width: double.infinity, padding: pad, child: child)
+          : p.metro
+              // Line: a solid card on the sky. A requested colour is a
+              // tint laid into the card, never a different material.
               ? CustomPaint(
-                  foregroundPainter: InstEdge(p),
+                  foregroundPainter: LineEdge(p),
                   child: Container(
                     width: double.infinity,
                     padding: pad,
@@ -821,7 +828,14 @@ class Section extends StatelessWidget {
               Flexible(
                 child: Text(
                   title,
-                  style: F.head.copyWith(color: p.ink),
+                  // Line: section titles in the display face, a step up.
+                  style: p.metro
+                      ? F.t2.copyWith(
+                          color: p.ink,
+                          fontFamily: LineTok.display,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: -.5)
+                      : F.head.copyWith(color: p.ink),
                   maxLines: wrapTitle ? null : 2,
                   overflow: wrapTitle
                       ? TextOverflow.visible
@@ -885,6 +899,7 @@ class SignalCard extends StatelessWidget {
     final p = P.of(c);
     return Surface(
       onTap: onTap,
+      open: true,
       semanticLabel: '$label, $value ${uiText(c, unit)}'.trim(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -926,7 +941,7 @@ class SignalCard extends StatelessWidget {
           if (sub.isNotEmpty) ...[
             const SizedBox(height: S.x1),
             Text(
-              sub,
+              calm(p, sub),
               style: F.over.copyWith(color: p.ink3),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -1883,7 +1898,7 @@ class MetricRow extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
-        if (sub.isNotEmpty) Text(sub, style: F.over.copyWith(color: p.ink3)),
+        if (sub.isNotEmpty) Text(calm(p, sub), style: F.over.copyWith(color: p.ink3)),
       ],
     );
     final big = bigText(c);
@@ -2560,17 +2575,22 @@ class _SubTabsState extends State<SubTabs> {
                           // the active pill and the empty ground of a live one, and
                           // `ink3` is solved for 4.5:1 ON `card2` (see theme.dart), so
                           // this cue costs no contrast the way dimming would.
+                  // Glass and Line: a segmented control. The active section is
+                  // a raised segment with ink text, the rest quiet text.
                   color: off
                       ? p.card2
                       : on
-                          ? p.wash(color)
+                          ? (p.glass || p.metro ? p.cardSolid : p.wash(color))
                           : const Color(0x00000000),
                   borderRadius: R.rPill,
+                  boxShadow: on && (p.glass || p.metro) ? p.el(1) : null,
                 ),
                 child: Text(
                   items[i],
                   style: F.cap.copyWith(
-                    color: on ? p.on(color) : p.ink3,
+                    color: on
+                        ? (p.glass || p.metro ? p.ink : p.on(color))
+                        : (p.glass || p.metro ? p.ink2 : p.ink3),
                     fontWeight: on ? FontWeight.w600 : FontWeight.w500,
                   ),
                 ),
@@ -2603,10 +2623,14 @@ class ScreenTitle extends StatelessWidget {
           Expanded(
             child: Text(
               title,
-              // Instrument sets titles larger and tighter, like the face of
-              // a dial; the other styles keep the system title.
-              style: p.inst
-                  ? F.display.copyWith(color: p.ink, letterSpacing: -1.1)
+              // Line sets titles in its display face, larger and
+              // lighter; the other styles keep the system title.
+              style: p.metro
+                  ? F.display.copyWith(
+                      color: p.ink,
+                      fontFamily: LineTok.display,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: -1.2)
                   : F.t1.copyWith(color: p.ink),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

@@ -131,7 +131,6 @@ const Map<String, String> kPrefTypes = {
   'coach_use_chatgpt': 'bool',
   'coach_use_apple': 'bool',
   'ui.liquid_glass': 'bool',
-  'ui.theme': 'string',
   'ui.style': 'string',
   'cycle_tracking_enabled': 'bool',
   'dev.mode': 'bool',

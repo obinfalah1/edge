@@ -127,7 +127,7 @@ class SetRow extends StatelessWidget {
                     style: F.cap.copyWith(
                         color: p.ink3, fontWeight: FontWeight.w600)),
               if (sub.isNotEmpty)
-                Text(sub, style: F.over.copyWith(color: p.ink3)),
+                Text(calm(p, sub), style: F.over.copyWith(color: p.ink3)),
             ]),
           ),
           // THE ROW RULE (see MetricRow): the title is the only flexible part,
@@ -208,13 +208,19 @@ class ProfileAvatar extends StatelessWidget {
         width: 40,
         height: 40,
         alignment: Alignment.center,
-        decoration: BoxDecoration(shape: BoxShape.circle, color: p.fill(accent)),
+        // Glass and Line: a quiet circle, so the avatar never competes with
+        // the screen's own colour.
+        decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: p.glass || p.metro ? p.card : p.fill(accent),
+            border: p.glass || p.metro ? Border.all(color: p.line) : null),
         child: initial.isEmpty
-            ? Icon(LucideIcons.user, size: 18, color: p.inkOnFill)
+            ? Icon(LucideIcons.user, size: 18, color: p.glass || p.metro ? p.ink2 : p.inkOnFill)
             : ExcludeSemantics(
                 child: Text(initial.characters.first.toUpperCase(),
                     style: F.body.copyWith(
-                        color: p.inkOnFill, fontWeight: FontWeight.w600)),
+                        color: p.glass || p.metro ? p.ink2 : p.inkOnFill,
+                        fontWeight: FontWeight.w600)),
               ),
       ),
     );

@@ -297,7 +297,21 @@ Map<String, Widget> componentCases() => {
       'moving_backdrop': const SizedBox(
           height: 160,
           child: MovingBackdrop(child: SizedBox.expand())),
-      'theme_picker': ThemePickerRow(chosen: EdgeTheme.prism, onPick: (_) {}),
+      'metro_day': Column(children: [
+        MetroSign(
+            next: MetroStop('Dhuhr', DateTime(2026, 11, 22, 12, 7)),
+            now: DateTime(2026, 11, 22, 10, 55),
+            clock: (t) => '${t.hour}:${t.minute.toString().padLeft(2, '0')}'),
+        MetroDay(
+          now: DateTime(2026, 11, 22, 10, 55),
+          clock: (t) => '${t.hour}:${t.minute.toString().padLeft(2, '0')}',
+          stops: [
+            MetroStop('Fajr', DateTime(2026, 11, 22, 5, 19), note: 'Alarm 5:34'),
+            MetroStop('Dhuhr', DateTime(2026, 11, 22, 12, 7)),
+            MetroStop('Asr', DateTime(2026, 11, 22, 15, 9)),
+          ],
+        ),
+      ]),
       'pill_row': const Wrap(spacing: S.x2, runSpacing: S.x2, children: [
         Pill('Estimated', C.yellow, icon: LucideIcons.circleDashed),
         Pill('Relative', C.purple),

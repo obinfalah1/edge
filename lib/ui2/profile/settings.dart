@@ -821,7 +821,7 @@ class MoreSettingsView extends StatelessWidget {
                   SetRow(LucideIcons.sun, C.yellow,
                       l?.settingsAppearanceRowTitle ?? 'Appearance',
                       value: appearance, onTap: onCycleAppearance),
-                  // Personal additions: the style, and the Liquid Glass colour.
+                  // Personal addition: the style.
                   ValueListenableBuilder<EdgeStyle>(
                     valueListenable: GlassLook.style,
                     builder: (c, style, _) => SetRow(
@@ -829,22 +829,12 @@ class MoreSettingsView extends StatelessWidget {
                         sub: switch (style) {
                           EdgeStyle.original => 'The app as it first shipped',
                           EdgeStyle.glass => 'Frosted glass over moving colour',
-                          EdgeStyle.instrument =>
-                            'Solid machined panels and watch-face dials',
+                          EdgeStyle.line =>
+                            'Your day drawn as a metro line',
                         },
                         value: style.label,
                         onTap: () => GlassLook.set(EdgeStyle.values[
                             (style.index + 1) % EdgeStyle.values.length])),
-                  ),
-                  ValueListenableBuilder<EdgeStyle>(
-                    valueListenable: GlassLook.style,
-                    builder: (c, style, _) => style != EdgeStyle.glass
-                        ? const SizedBox.shrink()
-                        : ValueListenableBuilder<EdgeTheme>(
-                            valueListenable: EdgeThemes.current,
-                            builder: (c, look, _) => ThemePickerRow(
-                                chosen: look, onPick: EdgeThemes.set),
-                          ),
                   ),
                   SetRow(LucideIcons.clock, C.teal,
                       l?.settingsClockFormatRowTitle ?? 'Time format',

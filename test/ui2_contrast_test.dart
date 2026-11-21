@@ -216,7 +216,7 @@ void main() {
 
   group('instrument: ink and accents clear AA', () {
     for (final tone in EdgeTone.values) {
-      final p = P(tone != EdgeTone.light, inst: true, mid: tone == EdgeTone.mid);
+      final p = P(tone != EdgeTone.light, metro: true, mid: tone == EdgeTone.mid);
       test('instrument · ${tone.name}', () {
         for (final (ik, iv) in [('ink', p.ink), ('ink2', p.ink2), ('ink3', p.ink3)]) {
           for (final (sk, sv) in [('page', p.bgSolid), ('card', p.card), ('card2', p.card2)]) {
@@ -224,7 +224,7 @@ void main() {
             expect(r, greaterThanOrEqualTo(_aa), reason: '$ik ${r.toStringAsFixed(2)}:1 on $sk');
           }
         }
-        for (final accent in [...C.all, InstTok.lapis]) {
+        for (final accent in [...C.all, LineTok.lapis]) {
           for (final sv in [p.bgSolid, p.card, p.card2]) {
             final r = P.contrast(p.on(accent), sv);
             expect(r, greaterThanOrEqualTo(_aa),

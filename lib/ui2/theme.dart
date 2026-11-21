@@ -26,7 +26,6 @@
 //      dark-mode branch.
 
 import 'dart:math' as math;
-import 'dart:ui' show lerpDouble;
 import 'package:flutter/cupertino.dart' show NoDefaultCupertinoThemeData;
 import 'package:flutter/material.dart';
 
@@ -141,9 +140,9 @@ class P {
   /// backdrop of the chosen [look], and cards and fills turn translucent.
   final bool glass;
 
-  /// The Instrument style: solid machined panels, stone and graphite, one
-  /// lapis signal colour, dials with graduations (see [InstTok]).
-  final bool inst;
+  /// The Line style: metro-map navy and white, line colours as data colours,
+  /// gold for prayer times and "now", the day as a metro line (see [LineTok]).
+  final bool metro;
 
   /// The Mid tone: light ink (so [dark] is true) on a mid-tone page.
   final bool mid;
@@ -152,7 +151,7 @@ class P {
   final EdgeTheme look;
   const P(this.dark,
       {this.glass = false,
-      this.inst = false,
+      this.metro = false,
       this.mid = false,
       this.look = EdgeTheme.pulse});
 
@@ -162,7 +161,7 @@ class P {
     final dark = t.brightness == Brightness.dark;
     return P(dark,
         glass: e?.glass ?? false,
-        inst: e?.inst ?? false,
+        metro: e?.metro ?? false,
         mid: dark && (e?.mid ?? false),
         look: e?.look ?? EdgeTheme.pulse);
   }
@@ -174,10 +173,8 @@ class P {
   /// (moving_backdrop.dart) is painted under each route instead.
   bool get moving => glass;
 
-  /// The Prism colour: its glass rims split light cyan to iris to rose.
-  bool get prism => glass && look == EdgeTheme.prism;
 
-  /// Picks the Instrument value for this tone.
+  /// Picks the Line value for this tone.
   Color _i(Color light, Color mid, Color dark) =>
       !this.dark ? light : (this.mid ? mid : dark);
 
@@ -185,22 +182,22 @@ class P {
 
   /// The page colour as a solid fill, for surfaces that must cover what is
   /// behind them (a sheet, the launch cover) even when pages are see-through.
-  Color get bgSolid => inst
-      ? _i(InstTok.pageL, InstTok.pageM, InstTok.pageD)
+  Color get bgSolid => metro
+      ? _i(LineTok.pageL, LineTok.pageM, LineTok.pageD)
       : glass
           ? skyFor(look, tone).base
           : (dark ? const Color(0xFF000000) : const Color(0xFFF2F2F7));
 
   /// Cards. Under glass they are translucent, so the backdrop shows through
   /// every card, row and chip on every screen (nothing reads as flat grey).
-  Color get card => inst
-      ? _i(InstTok.cardL, InstTok.cardM, InstTok.cardD)
+  Color get card => metro
+      ? _i(LineTok.cardL, LineTok.cardM, LineTok.cardD)
       : glass
           ? (dark ? (mid ? const Color(0x17FFFFFF) : const Color(0x1AFFFFFF))
               : const Color(0x9EFFFFFF))
           : (dark ? const Color(0xFF1C1C1E) : C.white);
-  Color get card2 => inst
-      ? _i(InstTok.card2L, InstTok.card2M, InstTok.card2D)
+  Color get card2 => metro
+      ? _i(LineTok.card2L, LineTok.card2M, LineTok.card2D)
       : glass
           ? (dark ? (mid ? const Color(0x0FFFFFFF) : const Color(0x12FFFFFF))
               : const Color(0x6BFFFFFF))
@@ -212,20 +209,20 @@ class P {
       ? const Color(0xB8FFFFFF)
       : (mid
           ? const Color(0x1CFFFFFF)
-          : (prism ? const Color(0x24FFFFFF) : const Color(0x21FFFFFF)));
+          : const Color(0x21FFFFFF));
 
   /// A card that must hide what is under it (sheets, dialogs, menus).
   Color get cardSolid => glass
       ? Color.alphaBlend(dark ? const Color(0x2EFFFFFF) : const Color(0xE6FFFFFF),
           bgSolid)
       : card;
-  Color get line => inst
-      ? _i(InstTok.lineL, InstTok.lineM, InstTok.lineD)
+  Color get line => metro
+      ? _i(LineTok.lineL, LineTok.lineM, LineTok.lineD)
       : glass
           ? (dark ? const Color(0x29FFFFFF) : const Color(0x1F000000))
           : (dark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA));
-  Color get track => inst
-      ? _i(InstTok.trackL, InstTok.trackM, InstTok.trackD)
+  Color get track => metro
+      ? _i(LineTok.trackL, LineTok.trackM, LineTok.trackD)
       : glass
           ? (dark ? const Color(0x2EFFFFFF) : const Color(0x24000000))
           : (dark ? const Color(0xFF38383A) : const Color(0xFFE5E5EA));
@@ -233,9 +230,9 @@ class P {
   /// The worst surface text can land on: the card over the backdrop's
   /// lightest field (light ink) or darkest field (dark ink). Translucent
   /// fills have no contrast of their own, so the solver measures this.
-  /// Instrument is solid: its lightest panel (light ink) or its page (dark).
+  /// Line is solid: its lightest card (light ink) or its page (dark).
   Color get floor {
-    if (inst) return dark ? card2 : bgSolid;
+    if (metro) return dark ? card2 : bgSolid;
     if (!glass) return card2;
     final f = skyExtreme(look, tone, lightest: dark);
     return Color.alphaBlend(dark ? glassTop : card2, f);
@@ -245,18 +242,18 @@ class P {
   /// shadow is lighter than the dark page and reads as a glow, not a shadow.
   Color get shadow => dark ? const Color(0xFF000000) : C.n900;
 
-  /// Card corners: Instrument's plates are cut a little tighter.
-  BorderRadius get cardRadius => inst ? R.rInst : R.rLg;
+  /// Card corners: Line's are softer and larger.
+  BorderRadius get cardRadius => metro ? R.rMetro : R.rLg;
 
-  /// The selection tint: the look's own under glass, lapis in Instrument,
+  /// The selection tint: the look's own under glass, amber in Line,
   /// the system blue otherwise.
-  Color get tint => inst ? InstTok.lapis : (glass ? look.tint : C.blue);
+  Color get tint => metro ? LineTok.lapis : (glass ? look.tint : C.blue);
 
-  Color get ink => inst
-      ? _i(InstTok.inkL, InstTok.inkM, InstTok.inkD)
+  Color get ink => metro
+      ? _i(LineTok.inkL, LineTok.inkM, LineTok.inkD)
       : (dark ? const Color(0xFFFFFFFF) : const Color(0xFF000000));
-  Color get ink2 => inst
-      ? _i(InstTok.ink2L, InstTok.ink2M, InstTok.ink2D)
+  Color get ink2 => metro
+      ? _i(LineTok.ink2L, LineTok.ink2M, LineTok.ink2D)
       : dark
           ? (!glass
               ? const Color(0xFFAEAEB2)
@@ -267,8 +264,8 @@ class P {
   /// (light theme) / lightest (dark theme) surface it can sit on — so it is
   /// legible on every surface, not just the one it was eyeballed against.
   /// The values it replaces measured 4.34:1 and 3.21:1 respectively.
-  Color get ink3 => inst
-      ? _i(InstTok.ink3L, InstTok.ink3M, InstTok.ink3D)
+  Color get ink3 => metro
+      ? _i(LineTok.ink3L, LineTok.ink3M, LineTok.ink3D)
       : !glass
           ? (dark ? const Color(0xFF98989F) : const Color(0xFF6C6C70))
           : dark
@@ -431,17 +428,17 @@ class F {
       letterSpacing: .5);
 
   // Numerals — a parallel display ramp. Tabular, so a live value never jitters
-  // its own layout as digits change. Instrument sets them in Manrope, a
-  // geometric face with open, gauge-like figures; the app flips [numerals]
-  // with the style and rebuilds every screen through the theme.
+  // its own layout as digits change. Line sets them in Readex Pro, light
+  // and large (figures read as the content, not as labels); the app flips
+  // [numerals] with the style and rebuilds every screen through the theme.
   static bool numerals = false;
-  static const _m = 'Manrope';
+  static const _m = 'Readex Pro';
   static TextStyle _num(TextStyle s) => numerals
       ? s.copyWith(
           fontFamily: _m,
-          fontFamilyFallback: const [],
-          fontWeight: FontWeight.w600,
-          letterSpacing: (s.letterSpacing ?? 0) * .7)
+          fontFamilyFallback: const ['Manrope'],
+          fontWeight: (s.fontSize ?? 17) >= 24 ? FontWeight.w400 : FontWeight.w500,
+          letterSpacing: (s.letterSpacing ?? 0) * .6)
       : s;
   static TextStyle get n48 => _num(_n48);
   static TextStyle get n34 => _num(_n34);
@@ -515,9 +512,9 @@ class R {
   static const rXxl = BorderRadius.all(Radius.circular(xxl));
   static const rPill = BorderRadius.all(Radius.circular(pill));
 
-  /// Instrument's plates: a precise 14 pt cut.
-  static const inst = 14.0;
-  static const rInst = BorderRadius.all(Radius.circular(inst));
+  /// Line's cards: soft, generous corners.
+  static const metro = 20.0;
+  static const rMetro = BorderRadius.all(Radius.circular(metro));
 }
 
 /// ── MOTION ── one gate, no exceptions ─────────────────────────────────────
@@ -640,159 +637,60 @@ class _Gated extends PageTransitionsBuilder {
   }
 }
 
-/// ── LOOKS ── five themes, each in Light, Mid and Dark ─────────────────
+/// ── LIQUID GLASS ── the backdrop, in Light, Mid and Dark ──────────────
 ///
-/// Pulse (black, steel, recovery green), Clay (paper, stone, terracotta),
-/// Bloom (violet, magenta, sunset), Fajr (the real sky by the clock) and
-/// Prism (the signature look). Brightness is separate (Appearance).
-enum EdgeTheme { pulse, clay, bloom, fajr, prism }
+/// One look: deep teal, navy and plum fields drifting under the glass, with
+/// recovery green for selection. Brightness is separate (Appearance).
+enum EdgeTheme { pulse }
 
 /// How light the page is. Mid keeps light ink on a mid-tone page.
 enum EdgeTone { light, mid, dark }
 
 extension EdgeThemeInfo on EdgeTheme {
-  String get label => switch (this) {
-        EdgeTheme.pulse => 'Pulse',
-        EdgeTheme.clay => 'Clay',
-        EdgeTheme.bloom => 'Bloom',
-        EdgeTheme.fajr => 'Fajr',
-        EdgeTheme.prism => 'Prism',
-      };
-
-  String get blurb => switch (this) {
-        EdgeTheme.pulse => 'Black, steel and recovery green',
-        EdgeTheme.clay => 'Warm paper, stone and terracotta',
-        EdgeTheme.bloom => 'Violet, magenta and sunset orange',
-        EdgeTheme.fajr => 'The sky outside, from night to dawn to dusk',
-        EdgeTheme.prism => 'Light through glass: the signature look',
-      };
-
-  /// The accent for selection and controls. Always a mid-light colour, so
-  /// it reads on every tone; text in it goes through `P.on`.
-  Color get tint => switch (this) {
-        EdgeTheme.pulse => const Color(0xFF1FD67A),
-        EdgeTheme.clay => const Color(0xFFD97757),
-        EdgeTheme.bloom => const Color(0xFFE6347A),
-        EdgeTheme.fajr => const Color(0xFFE9A93B),
-        EdgeTheme.prism => const Color(0xFF8E86FF),
-      };
-
-  /// The three swatches shown on the theme picker.
-  List<Color> get swatch => switch (this) {
-        EdgeTheme.pulse => const [Color(0xFF0B0E10), Color(0xFF2A3640), Color(0xFF1FD67A)],
-        EdgeTheme.clay => const [Color(0xFFF4EEE4), Color(0xFF8A7A68), Color(0xFFD97757)],
-        EdgeTheme.bloom => const [Color(0xFF6A2BD9), Color(0xFFE6347A), Color(0xFFF7943A)],
-        EdgeTheme.fajr => const [Color(0xFF141B4A), Color(0xFFE38A8A), Color(0xFFE9A93B)],
-        EdgeTheme.prism => const [Color(0xFF3FD0E0), Color(0xFF8E86FF), Color(0xFFF2B36B)],
-      };
+  /// The accent for selection and controls; text in it goes through `P.on`.
+  Color get tint => const Color(0xFF34D399);
 }
 
 /// One frame of a backdrop: the page colour and four drifting fields.
 class Sky {
   final Color base;
   final List<Color> fields;
-
-  /// 0..1: how many stars show (Fajr at night only).
-  final double stars;
-  const Sky(this.base, this.fields, {this.stars = 0});
-
-  static Sky lerp(Sky a, Sky b, double t) => Sky(
-        Color.lerp(a.base, b.base, t)!,
-        [for (var i = 0; i < 4; i++) Color.lerp(a.fields[i], b.fields[i], t)!],
-        stars: lerpDouble(a.stars, b.stars, t)!,
-      );
+  const Sky(this.base, this.fields);
 }
 
-/// The dark version of each look. Mid and Light are derived from it, so the
-/// three tones of one look are always the same colours at a different depth.
-const _dark = <EdgeTheme, Sky>{
-  EdgeTheme.pulse: Sky(Color(0xFF07090B), [
-    Color(0xFF0C3B2A), // deep recovery green
-    Color(0xFF1B2733), // steel
-    Color(0xFF0A2F33), // teal
-    Color(0xFF22272D), // graphite
-  ]),
-  EdgeTheme.clay: Sky(Color(0xFF1C1A18), [
-    Color(0xFF5A2A1A), // burnt terracotta
-    Color(0xFF3A3024), // umber
-    Color(0xFF4A3322), // clay
-    Color(0xFF2C2925), // stone
-  ]),
-  EdgeTheme.bloom: Sky(Color(0xFF0B0612), [
-    Color(0xFF4A178C), // violet
-    Color(0xFF8C1650), // magenta
-    Color(0xFF9A3A12), // sunset orange
-    Color(0xFF2B1A78), // indigo
-  ]),
-  // Prism: light split through glass, cyan to iris to rose to amber.
-  EdgeTheme.prism: Sky(Color(0xFF04050C), [
-    Color(0xFF0B3AC8), // electric blue
-    Color(0xFF6A14C8), // iris
-    Color(0xFFB0106A), // rose
-    Color(0xFF00708A), // cyan
-  ]),
-};
-
-/// Fajr: the sky through the day, keyed by the hour on the phone's clock.
-const _fajrDay = <(double, Sky)>[
-  (0.0, Sky(Color(0xFF04061A), [Color(0xFF141B4A), Color(0xFF0B1238), Color(0xFF1E1240), Color(0xFF0A1A3A)], stars: 1)),
-  (4.0, Sky(Color(0xFF060820), [Color(0xFF1A2160), Color(0xFF2A1650), Color(0xFF14204A), Color(0xFF0C1840)], stars: .9)),
-  (5.3, Sky(Color(0xFF120E2C), [Color(0xFF6A2E5E), Color(0xFF9A4A4A), Color(0xFF2A2468), Color(0xFF7A5A2A)], stars: .3)),
-  (6.5, Sky(Color(0xFF1A1630), [Color(0xFFA0565A), Color(0xFFB0782E), Color(0xFF3A3A7A), Color(0xFF8A4A6A)])),
-  (9.0, Sky(Color(0xFF0A1830), [Color(0xFF1E4A8A), Color(0xFF2A6A9A), Color(0xFF1A3A6A), Color(0xFF3A5A8A)])),
-  (15.0, Sky(Color(0xFF0A1A30), [Color(0xFF1A5A8A), Color(0xFF2A4A7A), Color(0xFF3A6A8A), Color(0xFF1A3A5A)])),
-  (17.5, Sky(Color(0xFF1A1220), [Color(0xFFA0502A), Color(0xFF8A3A4A), Color(0xFF4A2A5A), Color(0xFFB0702A)])),
-  (19.0, Sky(Color(0xFF0E0A22), [Color(0xFF4A2058), Color(0xFF6A2A40), Color(0xFF1E1A5A), Color(0xFF2A1A48)], stars: .4)),
-  (20.5, Sky(Color(0xFF04061A), [Color(0xFF141B4A), Color(0xFF0B1238), Color(0xFF1E1240), Color(0xFF0A1A3A)], stars: 1)),
-  (24.0, Sky(Color(0xFF04061A), [Color(0xFF141B4A), Color(0xFF0B1238), Color(0xFF1E1240), Color(0xFF0A1A3A)], stars: 1)),
-];
-
-Sky _fajrAt(double hour) {
-  for (var i = 0; i < _fajrDay.length - 1; i++) {
-    final (h0, a) = _fajrDay[i];
-    final (h1, b) = _fajrDay[i + 1];
-    if (hour >= h0 && hour <= h1) {
-      return Sky.lerp(a, b, (hour - h0) / (h1 - h0));
-    }
-  }
-  return _fajrDay.first.$2;
-}
+/// The dark backdrop. Mid and Light are derived from it, so the three tones
+/// are the same colours at a different depth.
+const _darkSky = Sky(Color(0xFF05080C), [
+  Color(0xFF0E3A3B), // deep teal
+  Color(0xFF1B2A45), // navy
+  Color(0xFF24183F), // plum
+  Color(0xFF0B2A36), // ink blue
+]);
 
 /// Mid: the dark look lifted toward a cool slate, still dark enough that the
 /// light ink keeps AA on the glass over it.
 const _midLift = Color(0xFF6E7480);
 
-/// Light: the dark look washed out toward paper.
-Color _lightPaper(EdgeTheme t) => switch (t) {
-      EdgeTheme.clay => const Color(0xFFF6F0E6),
-      EdgeTheme.bloom => const Color(0xFFFBF2F6),
-      EdgeTheme.fajr => const Color(0xFFF2F1F7),
-      EdgeTheme.pulse => const Color(0xFFECEFF0),
-      EdgeTheme.prism => const Color(0xFFF1F2F8),
-    };
+/// Light: the dark look washed out toward a cool off-white.
+const _lightPaper = Color(0xFFEEF0F3);
 
-Sky _toned(Sky dark, EdgeTheme t, EdgeTone tone) {
+Sky _toned(Sky dark, EdgeTone tone) {
   final raw = switch (tone) {
     EdgeTone.dark => dark,
-    EdgeTone.mid => Sky(
-        Color.lerp(dark.base, _midLift, .72)!,
-        [for (final f in dark.fields) Color.lerp(f, _midLift, .3)!],
-        stars: dark.stars * .6),
-    EdgeTone.light => Sky(
-        Color.lerp(dark.base, _lightPaper(t), .94)!,
-        [for (final f in dark.fields) Color.lerp(f, _lightPaper(t), .62)!]),
+    EdgeTone.mid => Sky(Color.lerp(dark.base, _midLift, .72)!,
+        [for (final f in dark.fields) Color.lerp(f, _midLift, .3)!]),
+    EdgeTone.light => Sky(Color.lerp(dark.base, _lightPaper, .94)!,
+        [for (final f in dark.fields) Color.lerp(f, _lightPaper, .72)!]),
   };
   // The contrast guard: a field may be as colourful as it likes, but never
   // so bright (light ink) or so dark (dark ink) that the ink on the glass
-  // over it drops under AA. Each colour is pulled toward black or paper only
-  // as far as it has to be.
+  // over it drops under AA. Each colour is pulled only as far as it has to be.
   Color fit(Color c) => switch (tone) {
         EdgeTone.dark => _cap(c, const Color(0xFF000000), (l) => l <= .028),
         EdgeTone.mid => _cap(c, const Color(0xFF000000), (l) => l <= .085),
-        EdgeTone.light => _cap(c, _lightPaper(t), (l) => l >= .56),
+        EdgeTone.light => _cap(c, _lightPaper, (l) => l >= .56),
       };
-  return Sky(fit(raw.base), [for (final f in raw.fields) fit(f)],
-      stars: raw.stars);
+  return Sky(fit(raw.base), [for (final f in raw.fields) fit(f)]);
 }
 
 final _capCache = <int, Color>{};
@@ -814,127 +712,112 @@ Color _cap(Color c, Color toward, bool Function(double) ok) {
   return _capCache[key] = Color.lerp(c, toward, hi)!;
 }
 
-/// The backdrop for a look and tone. Fajr reads the clock; the others are
-/// fixed.
-Sky skyFor(EdgeTheme t, EdgeTone tone, {DateTime? now}) {
-  final n = now ?? DateTime.now();
-  final dark = t == EdgeTheme.fajr
-      ? _fajrAt(n.hour + n.minute / 60.0)
-      : _dark[t]!;
-  return _toned(dark, t, tone);
-}
+/// The backdrop for a tone.
+Sky skyFor(EdgeTheme t, EdgeTone tone) => _toned(_darkSky, tone);
 
-
-/// The lightest (or darkest) colour any part of the backdrop can reach, over
-/// the whole day for Fajr: what the contrast solver measures against. Two
-/// fields can overlap, so a field is taken at its combined strength.
+/// The lightest (or darkest) colour any part of the backdrop can reach: what
+/// the contrast solver measures against. Two fields can overlap, so a field
+/// is taken at its combined strength.
 Color skyExtreme(EdgeTheme t, EdgeTone tone, {required bool lightest}) {
-  final skies = t == EdgeTheme.fajr
-      ? [for (final (h, _) in _fajrDay) _toned(_fajrAt(h), t, tone)]
-      : [skyFor(t, tone)];
+  final s = skyFor(t, tone);
   Color? best;
-  for (final s in skies) {
-    for (final c in [
-      s.base,
-      for (final f in s.fields)
-        Color.alphaBlend(f.withValues(alpha: MovingFields.strength), s.base),
-    ]) {
-      final l = c.computeLuminance();
-      if (best == null ||
-          (lightest ? l > best.computeLuminance() : l < best.computeLuminance())) {
-        best = c;
-      }
+  for (final c in [
+    s.base,
+    for (final f in s.fields)
+      Color.alphaBlend(f.withValues(alpha: MovingFields.strength), s.base),
+  ]) {
+    final l = c.computeLuminance();
+    if (best == null ||
+        (lightest ? l > best.computeLuminance() : l < best.computeLuminance())) {
+      best = c;
     }
   }
   return best!;
 }
 
-/// How strongly the backdrop fields are painted, and how bright stars get.
+/// How strongly the backdrop fields are painted.
 class MovingFields {
   MovingFields._();
 
   /// Two overlapping fields at .7 reach .91 of the field colour.
   static const strength = .91;
   static const alpha = .7;
-  static const star = Color(0xFFFFFFFF);
-
-  /// The prism rim on cards in the signature look.
-  static const prismRim = [
-    Color(0xCC6FE3F0),
-    Color(0x998E86FF),
-    Color(0x66F08AB8),
-    Color(0x33F2B36B),
-  ];
-  static const prismRimLight = [
-    Color(0xFFFFFFFF),
-    Color(0x998E86FF),
-    Color(0x5540B8C8),
-    Color(0x33000000),
-  ];
 }
 
-/// ── INSTRUMENT ── the from-scratch style ─────────────────────────────────
+/// ── LINE ── the metro-map style ─────────────────────────────────────────
 ///
-/// A precision instrument for the body (Rams / Braun "less but better", Ando's
-/// one light gesture): matte mineral panels with a machined edge, warm-white
-/// ink on graphite or graphite ink on stone, and one lapis signal colour.
-/// The one expressive element is the dial: rings carry fine graduations, like
-/// a watch face. Everything else stays quiet.
-class InstTok {
-  InstTok._();
-  // Page, panel, raised panel, hairline, ring track. Light / Mid / Dark.
-  static const pageL = Color(0xFFE9E8E3);
-  static const cardL = Color(0xFFFAF9F6);
-  static const card2L = Color(0xFFF1F0EB);
-  static const lineL = Color(0xFFD7D5CD);
-  static const trackL = Color(0xFFDEDCD5);
-  static const pageM = Color(0xFF383B40);
-  static const cardM = Color(0xFF43464C);
-  static const card2M = Color(0xFF4B4F56);
-  static const lineM = Color(0xFF5B6067);
-  static const trackM = Color(0xFF555A61);
-  static const pageD = Color(0xFF0C0D0F);
-  static const cardD = Color(0xFF16181B);
-  static const card2D = Color(0xFF1E2125);
-  static const lineD = Color(0xFF2B2F35);
-  static const trackD = Color(0xFF272B30);
+/// From Dubai Metro wayfinding: signage navy and white, line colours as the
+/// data colours (recovery green, heart red, sleep blue) and gold for prayer
+/// times and "now". The signature is the day drawn as a metro line on Today:
+/// the prayers are its stations, with a "you are here" pin and the next stop
+/// counting down. Readex Pro for figures and titles, SF for text.
+class LineTok {
+  LineTok._();
+  // Page, card, raised card, hairline, ring track. Light / Mid / Dark.
+  static const pageL = Color(0xFFE9ECEF);
+  static const cardL = Color(0xFFFFFFFF);
+  static const card2L = Color(0xFFF4F6F8);
+  static const lineL = Color(0xFFD9DEE4);
+  static const trackL = Color(0xFFDDE2E7);
+  static const pageM = Color(0xFF2A3A4D);
+  static const cardM = Color(0xFF33455A);
+  static const card2M = Color(0xFF3B4E64);
+  static const lineM = Color(0xFF4A5E75);
+  static const trackM = Color(0xFF46596F);
+  static const pageD = Color(0xFF08131F);
+  static const cardD = Color(0xFF0F1E2E);
+  static const card2D = Color(0xFF16283B);
+  static const lineD = Color(0xFF22364C);
+  static const trackD = Color(0xFF22364C);
 
-  // Ink: graphite on stone, warm white on graphite.
-  static const inkL = Color(0xFF15161A);
-  static const ink2L = Color(0xFF3A3B40);
-  static const ink3L = Color(0xFF5C5C61);
+  static const inkL = Color(0xFF0D1B2A);
+  static const ink2L = Color(0xFF2E3D4E);
+  static const ink3L = Color(0xFF4C5A6A);
   static const inkM = Color(0xFFFFFFFF);
-  static const ink2M = Color(0xFFEFEDE8);
-  static const ink3M = Color(0xFFDDDBD5);
-  static const inkD = Color(0xFFF4F2ED);
-  static const ink2D = Color(0xFFCFCCC5);
-  static const ink3D = Color(0xFFA19E98);
+  static const ink2M = Color(0xFFEEF2F6);
+  static const ink3M = Color(0xFFD3DCE5);
+  static const inkD = Color(0xFFF4F7FA);
+  static const ink2D = Color(0xFFC9D3DD);
+  static const ink3D = Color(0xFFA9B6C4);
 
-  /// The one signal colour.
-  static const lapis = Color(0xFF4F67E8);
+  /// The one accent: gold, for prayer times, "now" and selection.
+  static const lapis = Color(0xFFF5B53B);
 
-  /// The machined top edge on a panel, and the dial graduations.
-  static const bevelD = Color(0x14FFFFFF);
+  /// The signage panel (the "next stop" sign), the same in every tone.
+  static const sign = Color(0xFF0D1B2A);
+  static const signInk = Color(0xFFF4F7FA);
+  static const signMute = Color(0xFFA9B6C4);
+
+  /// Line colours, used as data colours.
+  static const green = Color(0xFF19A974);
+  static const red = Color(0xFFE5484D);
+  static const blue = Color(0xFF3E8EF7);
+
+  /// The top light on a card, and nothing else.
+  static const bevelD = Color(0x10FFFFFF);
   static const bevelL = Color(0xFFFFFFFF);
+
+  /// The display face (titles and figures). SF stays the reading face.
+  static const display = 'Readex Pro';
 }
 
 /// The three ways the app can look (Settings › Style).
-enum EdgeStyle { original, glass, instrument }
+enum EdgeStyle { original, glass, line }
 
 extension EdgeStyleInfo on EdgeStyle {
   String get label => switch (this) {
         EdgeStyle.original => 'Original',
         EdgeStyle.glass => 'Liquid Glass',
-        EdgeStyle.instrument => 'Instrument',
+        EdgeStyle.line => 'Line',
       };
 }
 
-/// Instrument's panel edge: a hairline all round and a lighter machined line
-/// along the top, as if the plate were milled from one block.
-class InstEdge extends CustomPainter implements GuideDecoration {
+/// Line's card edge: no outline, only light catching the top edge (dark)
+/// or a hairline that keeps a white card off a pale page (light).
+class LineEdge extends CustomPainter implements GuideDecoration {
   final P p;
   final BorderRadius radius;
-  const InstEdge(this.p, {this.radius = R.rInst});
+  const LineEdge(this.p, {this.radius = R.rMetro});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -945,25 +828,19 @@ class InstEdge extends CustomPainter implements GuideDecoration {
         Paint()
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1
-          ..color = p.line);
-    canvas.drawRRect(
-        rr.deflate(1),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1
           ..shader = LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            stops: const [0, .12],
-            colors: [
-              p.dark ? InstTok.bevelD : InstTok.bevelL,
-              (p.dark ? InstTok.bevelD : InstTok.bevelL).withValues(alpha: 0),
-            ],
+            stops: const [0, .35, 1],
+            colors: p.dark
+                ? [LineTok.bevelD, LineTok.bevelD.withValues(alpha: 0),
+                    LineTok.bevelD.withValues(alpha: 0)]
+                : [p.line.withValues(alpha: .5), p.line, p.line],
           ).createShader(rect));
   }
 
   @override
-  bool shouldRepaint(InstEdge old) =>
+  bool shouldRepaint(LineEdge old) =>
       old.p.dark != p.dark || old.p.mid != p.mid || old.radius != radius;
 }
 
@@ -985,26 +862,31 @@ class GlassTok {
 /// rebuilds every screen. Off by default, which is what tests mount.
 class EdgeLook extends ThemeExtension<EdgeLook> {
   final bool glass;
-  final bool inst;
+  final bool metro;
   final bool mid;
   final EdgeTheme look;
   const EdgeLook(
       {this.glass = false,
-      this.inst = false,
+      this.metro = false,
       this.mid = false,
       this.look = EdgeTheme.pulse});
 
   @override
-  EdgeLook copyWith({bool? glass, bool? inst, bool? mid, EdgeTheme? look}) =>
+  EdgeLook copyWith({bool? glass, bool? metro, bool? mid, EdgeTheme? look}) =>
       EdgeLook(
           glass: glass ?? this.glass,
-          inst: inst ?? this.inst,
+          metro: metro ?? this.metro,
           mid: mid ?? this.mid,
           look: look ?? this.look);
 
   @override
   EdgeLook lerp(EdgeLook? other, double t) => t < .5 ? this : (other ?? this);
 }
+
+/// Glass and Line never join a line of text with middle dots: a comma reads
+/// as a sentence, the dot reads as generated chrome.
+String calm(P p, String s) =>
+    p.glass || p.metro ? s.replaceAll(' · ', ', ') : s;
 
 bool glassOf(BuildContext c) =>
     Theme.of(c).extension<EdgeLook>()?.glass ?? false;
@@ -1034,13 +916,11 @@ BoxDecoration glassDecoration(P p,
 /// A card colour a caller passed that is only the default card fill again.
 bool isPlainCard(P p, Color? c) => c == null || c == p.card || c == p.card2;
 
-/// The glass rim: bright along the top edge, fading down the sides. In the
-/// signature look it is a prism edge, light split cyan to iris to rose.
+/// The glass rim: bright along the top edge, fading down the sides.
 class GlassRim extends CustomPainter implements GuideDecoration {
   final bool dark;
   final BorderRadius radius;
-  final bool prism;
-  const GlassRim(this.dark, {this.radius = R.rLg, this.prism = false});
+  const GlassRim(this.dark, {this.radius = R.rLg});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1050,39 +930,31 @@ class GlassRim extends CustomPainter implements GuideDecoration {
       rr,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = prism ? 1.2 : 1
-        ..shader = (prism
-                ? LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: dark ? MovingFields.prismRim : MovingFields.prismRimLight,
-                  )
-                : LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: dark
-                        ? const [Color(0x8CFFFFFF), Color(0x33FFFFFF)]
-                        : const [Color(0xFFFFFFFF), Color(0x29000000)],
-                  ))
-            .createShader(rect),
+        ..strokeWidth = 1
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: dark
+              ? const [Color(0x8CFFFFFF), Color(0x33FFFFFF)]
+              : const [Color(0xFFFFFFFF), Color(0x29000000)],
+        ).createShader(rect),
     );
   }
 
   @override
-  bool shouldRepaint(GlassRim old) =>
-      old.dark != dark || old.radius != radius || old.prism != prism;
+  bool shouldRepaint(GlassRim old) => old.dark != dark || old.radius != radius;
 }
 
 ThemeData buildTheme(Brightness b,
     {bool glass = false,
-    bool inst = false,
+    bool metro = false,
     bool mid = false,
     EdgeTheme look = EdgeTheme.pulse}) {
   final dark = b == Brightness.dark;
-  final p = P(dark, glass: glass, inst: inst, mid: dark && mid, look: look);
+  final p = P(dark, glass: glass, metro: metro, mid: dark && mid, look: look);
   return ThemeData(
     extensions: [
-      EdgeLook(glass: glass, inst: inst, mid: dark && mid, look: look)
+      EdgeLook(glass: glass, metro: metro, mid: dark && mid, look: look)
     ],
     brightness: b,
     scaffoldBackgroundColor: p.bg,

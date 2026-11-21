@@ -774,3 +774,14 @@ flutter:
           weight: 700
         - asset: assets/fonts/Manrope/Manrope-800.ttf
           weight: 800
+    # Daybreak's display face (titles and figures). OFL, from Google Fonts.
+    - family: Readex Pro
+      fonts:
+        - asset: assets/fonts/ReadexPro/ReadexPro-300.ttf
+          weight: 300
+        - asset: assets/fonts/ReadexPro/ReadexPro-400.ttf
+          weight: 400
+        - asset: assets/fonts/ReadexPro/ReadexPro-500.ttf
+          weight: 500
+        - asset: assets/fonts/ReadexPro/ReadexPro-600.ttf
+          weight: 600

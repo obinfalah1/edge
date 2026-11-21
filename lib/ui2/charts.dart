@@ -642,32 +642,57 @@ class Ring extends CustomPainter implements GuideRing {
       o.background != background;
 }
 
-/// Instrument's dial face: sixty fine graduations inside a ring, every fifth
-/// one longer, like the chapter ring of a watch.
-class DialTicks extends CustomPainter implements GuideDecoration {
-  final Color color;
-  final double stroke;
-  const DialTicks(this.color, {required this.stroke});
+/// Line's score track: a rail, the filled stretch, and stops. With [stops]
+/// it is a row of stations (learning: one per night needed, the banked ones
+/// filled); without, the fill ends in one stop at the value.
+class LineTrack extends CustomPainter implements GuideDecoration {
+  final double fill;
+  final int? stops;
+  final Color color, track, knock;
+  const LineTrack(
+      {required this.fill,
+      this.stops,
+      required this.color,
+      required this.track,
+      required this.knock});
 
   @override
   void paint(Canvas cv, Size s) {
-    final c = s.center(Offset.zero);
-    final outer = min(s.width, s.height) / 2 - stroke - 3;
-    final paint = Paint()
-      ..color = color
+    final y = s.height / 2;
+    final f = fill.clamp(0.0, 1.0);
+    final rail = Paint()
+      ..color = track
+      ..strokeWidth = 6
       ..strokeCap = StrokeCap.round;
-    for (var i = 0; i < 60; i++) {
-      final major = i % 5 == 0;
-      final a = i / 60 * 2 * pi - pi / 2;
-      final len = major ? 5.0 : 2.5;
-      paint.strokeWidth = major ? 1.2 : .8;
-      final d = Offset(cos(a), sin(a));
-      cv.drawLine(c + d * outer, c + d * (outer - len), paint);
+    final r = 5.0;
+    cv.drawLine(Offset(r, y), Offset(s.width - r, y), rail);
+    final x = r + (s.width - 2 * r) * f;
+    if (f > 0) {
+      cv.drawLine(Offset(r, y), Offset(x, y),
+          Paint()
+            ..color = color
+            ..strokeWidth = 6
+            ..strokeCap = StrokeCap.round);
+    }
+    void stop(double cx, Color c, double rad) {
+      cv.drawCircle(Offset(cx, y), rad + 2, Paint()..color = knock);
+      cv.drawCircle(Offset(cx, y), rad, Paint()..color = c);
+    }
+    final n = stops;
+    if (n != null && n > 0) {
+      final rad = n > 8 ? 3.0 : 4.5;
+      for (var i = 1; i <= n; i++) {
+        final cx = r + (s.width - 2 * r) * i / n;
+        stop(cx, i <= (f * n).round() ? color : track, rad);
+      }
+    } else if (f > 0) {
+      stop(x, color, 5);
     }
   }
 
   @override
-  bool shouldRepaint(DialTicks o) => o.color != color || o.stroke != stroke;
+  bool shouldRepaint(LineTrack o) =>
+      o.fill != fill || o.stops != stops || o.color != color || o.track != track;
 }
 
 /// One coloured arc of a [StageRing]: [fraction] of the FULL circle.

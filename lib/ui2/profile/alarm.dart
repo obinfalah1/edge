@@ -92,7 +92,7 @@ Widget alarmDoor(BuildContext c, DateTime? at, AlarmArmState state,
             ? AlarmScreenView._localizedStateLabel(c, state)
             : (l?.alarmInThePast ??
                 'In the past — it has already fired or been missed');
-        sub = '${AlarmScreenView._dayAndTime(c, at)} · $what';
+        sub = calm(P.of(c), '${AlarmScreenView._dayAndTime(c, at)} · $what');
       }
       return detailLinkRow(c, LucideIcons.alarmClock,
           l?.alarmNavTitle ?? 'Alarm', sub, () => go(c, const AlarmScreen()));
@@ -116,8 +116,8 @@ Widget alarmGlanceCard(BuildContext c, DateTime? at, AlarmArmState state,
         sub: at == null
             ? (l?.alarmSetAnAlarm ?? 'Set an alarm')
             : at.isAfter(n)
-                ? '${AlarmScreenView._whichDay(c, at, n)} · '
-                    '${AlarmScreenView._localizedStateLabel(c, state)}'
+                ? calm(P.of(c), '${AlarmScreenView._whichDay(c, at, n)} · '
+                    '${AlarmScreenView._localizedStateLabel(c, state)}')
                 : (l?.alarmGlanceInThePast ?? 'Fired or missed'),
         onTap: () => go(c, const AlarmScreen()),
       );

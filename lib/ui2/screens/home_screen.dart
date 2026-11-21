@@ -980,6 +980,25 @@ class RingTrio extends StatelessWidget {
       ],
     ];
 
+    // Line: no rings. Each score is a track with stops, like a stretch of
+    // metro line, and the card keeps every tap the rings had.
+    if (P.of(c).metro) {
+      return Surface(
+        elevation: 2,
+        pad: const EdgeInsets.symmetric(horizontal: S.x4, vertical: S.x2),
+        child: Column(children: [
+          if (header != null) ...[
+            const SizedBox(height: S.x2),
+            header!,
+            const SizedBox(height: S.x1),
+          ],
+          for (final (i, r) in rings.indexed)
+            _LineScore(r, first: i == 0 && header == null, onTap: _open(r.kind)),
+          ...slot,
+          const SizedBox(height: S.x2),
+        ]),
+      );
+    }
     return Surface(
       elevation: 2,
       child: Column(children: [
@@ -1013,6 +1032,66 @@ class RingTrio extends StatelessWidget {
   VoidCallback? _open(HomeRingKind k) {
     final f = onOpen;
     return f == null ? null : () => f(k);
+  }
+}
+
+/// Line's score: the label and the number on one line, and a track under
+/// them. Learning is a row of stops (one per night or day the baseline
+/// needs, the banked ones filled); a measured score fills the track to its
+/// value and ends in a stop.
+class _LineScore extends StatelessWidget {
+  final _RingState r;
+  final bool first;
+  final VoidCallback? onTap;
+  const _LineScore(this.r, {this.first = false, this.onTap});
+
+  @override
+  Widget build(BuildContext c) {
+    final p = P.of(c);
+    final col = r.calibrating ? p.on(r.color) : r.arc(p);
+    return Pressable(
+      onTap: onTap,
+      semanticLabel: '${r.label}, ${r.value}${r.sub.isEmpty ? '' : ', ${r.sub}'}',
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: S.x3),
+        decoration: first
+            ? null
+            : BoxDecoration(border: Border(top: BorderSide(color: p.line))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic, children: [
+            Text(r.label,
+                style: F.body.copyWith(color: p.ink, fontWeight: FontWeight.w600)),
+            const Spacer(),
+            // A reading is a figure; "learning" is a status, set quietly.
+            Text(r.value,
+                style: r.measured
+                    ? F.n24.copyWith(color: r.provisional ? p.ink3 : p.ink)
+                    : F.body.copyWith(color: p.ink2)),
+          ]),
+          const SizedBox(height: S.x2),
+          SizedBox(
+            height: 14,
+            width: double.infinity,
+            child: CustomPaint(
+              painter: LineTrack(
+                fill: r.calibrating
+                    ? ((r.need ?? 0) == 0 ? (r.frac ?? 0) : (r.have ?? 0) / r.need!)
+                    : (r.frac ?? 0),
+                stops: r.calibrating ? r.need : null,
+                color: col,
+                track: p.track,
+                knock: p.card,
+              ),
+            ),
+          ),
+          if (r.sub.isNotEmpty) ...[
+            const SizedBox(height: S.x1),
+            Text(r.sub, style: F.cap.copyWith(color: p.ink3)),
+          ],
+        ]),
+      ),
+    );
   }
 }
 
@@ -1221,9 +1300,16 @@ class _HomeInsetRow extends StatelessWidget {
   @override
   Widget build(BuildContext c) {
     final p = P.of(c);
+    // Glass and Line: never a card inside a card. The row sits in the card it
+    // belongs to, split off by a hairline.
+    final flat = p.glass || p.metro;
     final panel = Container(
-        padding: const EdgeInsets.fromLTRB(12, 12, 10, 12),
-        decoration: BoxDecoration(color: p.card2, borderRadius: R.rMd),
+        padding: flat
+            ? const EdgeInsets.fromLTRB(2, 12, 0, 4)
+            : const EdgeInsets.fromLTRB(12, 12, 10, 12),
+        decoration: flat
+            ? BoxDecoration(border: Border(top: BorderSide(color: p.line)))
+            : BoxDecoration(color: p.card2, borderRadius: R.rMd),
         child: child);
     return onTap == null ? panel : Pressable(onTap: onTap, child: panel);
   }
@@ -1573,11 +1659,6 @@ class _Dial extends StatelessWidget {
                 solid: r.measured,
                 background: p.card),
       ),
-      // Instrument: the dial's graduations, under the icon.
-      if (p.inst)
-        CustomPaint(
-            size: Size.infinite,
-            painter: DialTicks(p.ink3.withValues(alpha: .45), stroke: stroke)),
       Icon(r.icon, size: icon, color: r.ink(p)),
     ]);
   }
@@ -1706,8 +1787,12 @@ class _RingText extends StatelessWidget {
         ? CrossAxisAlignment.center
         : CrossAxisAlignment.start;
     return Column(crossAxisAlignment: cross, children: [
-      Text(r.label.toUpperCase(),
-          style: F.over.copyWith(color: p.ink3), textAlign: align),
+      // Glass and Line: the label in sentence case, no tracked capitals.
+      Text(p.glass || p.metro ? r.label : r.label.toUpperCase(),
+          style: p.glass || p.metro
+              ? F.cap.copyWith(color: p.ink2, fontWeight: FontWeight.w600)
+              : F.over.copyWith(color: p.ink3),
+          textAlign: align),
         const SizedBox(height: S.x1),
         // Absent reads as words, never as a dash and never as a zero, so it
         // takes the sentence weight rather than the numeral one.
@@ -2267,6 +2352,38 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
   /// already restricts the arrows to [_days] — so this just re-loads for it.
   /// The day shown, inside the rings card: tap to pick a day; the faint
   /// chevrons say the card swipes, and step a day when tapped too.
+  /// Line's Today: the prayers as stations, from the cached times only.
+  List<Widget> _metroDay(BuildContext c) {
+    final app = c.watch<AppState>();
+    final now = widget.now ?? debugHomeWallClock();
+    DateTime onToday(DateTime t) =>
+        DateTime(now.year, now.month, now.day, t.hour, t.minute);
+    final fajr = app.fajrPrayerNext;
+    final alarm = app.fajrAlarmNext;
+    final stops = <MetroStop>[
+      if (fajr != null)
+        MetroStop('Fajr', onToday(fajr),
+            note: alarm == null ? '' : 'Alarm ${formatClockOf(alarm)}'),
+      for (final e in app.prayerTimesToday.entries)
+        MetroStop(e.key.api, onToday(e.value)),
+    ]..sort((a, b) => a.at.compareTo(b.at));
+    if (stops.isEmpty) return const [];
+    MetroStop? next;
+    for (final s in stops) {
+      if (s.at.isAfter(now)) {
+        next = s;
+        break;
+      }
+    }
+    next ??= fajr == null ? null : MetroStop('Fajr', fajr);
+    return [
+      if (next != null) MetroSign(next: next, now: now, clock: formatClockOf),
+      const SizedBox(height: S.x3),
+      MetroDay(stops: stops, now: now, clock: formatClockOf),
+      const SizedBox(height: S.x4),
+    ];
+  }
+
   Widget _dayHeader(BuildContext c, HomeData d) {
     final p = P.of(c);
     final l = AppLocalizations.of(c);
@@ -2583,7 +2700,13 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
                     d.name == null || d.name!.isEmpty
                         ? g.word
                         : '${g.word}, ${d.name}',
-                    style: F.t2.copyWith(color: p.ink),
+                    style: p.metro
+                        ? F.t1.copyWith(
+                            color: p.ink,
+                            fontFamily: LineTok.display,
+                            fontWeight: FontWeight.w400,
+                            letterSpacing: -.8)
+                        : F.t2.copyWith(color: p.ink),
                   ),
                 ),
                 const SizedBox(width: S.x2),
@@ -2612,6 +2735,8 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
         ]),
       ),
 
+      // Line's signature: the next stop, and the day as a metro line.
+      if (p.metro && isToday) ..._metroDay(c),
       if (bare) ...[
         const DetectedActivitiesCard(),
       ],
@@ -2983,6 +3108,37 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
       }
     }
 
+    // Line: the figures share one card, split by hairlines, instead of
+    // a card each.
+    if (P.of(c).metro && cards.length > 1) {
+      final p = P.of(c);
+      Widget vline() => SizedBox(width: 1, child: ColoredBox(color: p.line));
+      Widget hline() => SizedBox(height: 1, child: ColoredBox(color: p.line));
+      return Column(children: [
+        Surface(
+          pad: EdgeInsets.zero,
+          child: Column(children: [
+            for (var i = 0; i < cards.length; i += 2) ...[
+              if (i > 0) hline(),
+              if (i + 1 >= cards.length)
+                cards[i]
+              else
+                IntrinsicHeight(
+                  child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(child: cards[i]),
+                        vline(),
+                        Expanded(child: cards[i + 1]),
+                      ]),
+                ),
+            ],
+          ]),
+        ),
+        if (absent.length == 1) ...[const SizedBox(height: S.x3), absent.single]
+        else if (absent.length > 1) ...[const SizedBox(height: S.x3), ...absent],
+      ]);
+    }
     return Column(children: [
       for (var i = 0; i < cards.length; i += 2) ...[
         if (i > 0) const SizedBox(height: S.x3),

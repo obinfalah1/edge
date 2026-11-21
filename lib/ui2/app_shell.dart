@@ -213,7 +213,7 @@ class _AppShellState extends State<AppShell> {
         ),
         bottomNavigationBar: glassOf(c)
             ? _GlassPillBar(current: _current, onTap: _select)
-            : p.inst
+            : p.metro
                 ? _InstBar(current: _current, onTap: _select)
                 : _TabBar(current: _current, onTap: _select),
       ),
@@ -387,7 +387,7 @@ class _GlassPillBar extends StatelessWidget {
                       bottom: 0,
                       child: CustomPaint(
                         foregroundPainter: GlassRim(p.dark,
-                            radius: lensRadius, prism: p.prism),
+                            radius: lensRadius),
                         child: DecoratedBox(
                           decoration: BoxDecoration(
                             borderRadius: lensRadius,
@@ -449,7 +449,7 @@ class _Tab extends StatelessWidget {
     // iOS 26: unselected items in the label colour, the selected one tinted.
     // Under glass the selected tab takes the theme's tint.
     final ink = on
-        ? p.on(lens || p.inst ? p.tint : domain.accent)
+        ? p.on(lens || p.metro ? p.tint : domain.accent)
         : (lens ? p.ink : p.ink3);
     // On the clear glass bar, a soft halo keeps icons and labels readable
     // over whatever scrolls beneath (Apple does this with vibrancy).
@@ -486,7 +486,7 @@ class _Tab extends StatelessWidget {
                 vertical: S.x1,
               ),
               decoration: BoxDecoration(
-                color: on && !lens && !p.inst
+                color: on && !lens && !p.metro
                     ? p.wash(domain.accent)
                     : const Color(0x00000000),
                 borderRadius: R.rPill,

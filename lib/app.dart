@@ -73,8 +73,6 @@ class _OpenStrapAppState extends State<OpenStrapApp> with WidgetsBindingObserver
     settingsRestoredSignal.addListener(_onSettingsRestored);
     GlassLook.load();
     GlassLook.style.addListener(_onGlass);
-    EdgeThemes.load();
-    EdgeThemes.current.addListener(_onGlass);
     unawaited(LocalDb.setForeground(
         screenReadsForeground(WidgetsBinding.instance.lifecycleState)));
     // Hand the BYOK provider config to AppState (briefing generation + the
@@ -99,8 +97,7 @@ class _OpenStrapAppState extends State<OpenStrapApp> with WidgetsBindingObserver
         context.read<UnitsController>().reloadFromPrefs));
     unawaited(_reloadRestoredSetting('clock_format',
         context.read<ClockFormatController>().reloadFromPrefs));
-    unawaited(_reloadRestoredSetting(EdgeThemes.themePrefKey, () async {
-      EdgeThemes.load();
+    unawaited(_reloadRestoredSetting(GlassLook.styleKey, () async {
       GlassLook.load();
     }));
   }
@@ -123,7 +120,6 @@ class _OpenStrapAppState extends State<OpenStrapApp> with WidgetsBindingObserver
   @override
   void dispose() {
     GlassLook.style.removeListener(_onGlass);
-    EdgeThemes.current.removeListener(_onGlass);
     settingsRestoredSignal.removeListener(_onSettingsRestored);
     WidgetsBinding.instance.removeObserver(this);
     _guideRunner.dispose();
@@ -203,8 +199,8 @@ class _OpenStrapAppState extends State<OpenStrapApp> with WidgetsBindingObserver
     locale.useForPresentation();
     final twelveHour = !context.watch<ClockFormatController>().resolve24h(
         MediaQuery.alwaysUse24HourFormatOf(context));
-    // Instrument sets numerals in its own face (see F.numerals).
-    F.numerals = GlassLook.style.value == EdgeStyle.instrument;
+    // Glass and Line set numerals in Readex Pro (see F.numerals).
+    F.numerals = GlassLook.style.value != EdgeStyle.original;
     return ChangeNotifierProvider<GuideRunner>.value(
       value: _guideRunner,
       // A guide run's dim and skeleton are painted by the components themselves;
@@ -217,13 +213,11 @@ class _OpenStrapAppState extends State<OpenStrapApp> with WidgetsBindingObserver
       // The palette is the design system's, the CHOICE is still the user's.
       theme: buildTheme(Brightness.light,
           glass: GlassLook.style.value == EdgeStyle.glass,
-          inst: GlassLook.style.value == EdgeStyle.instrument,
-          look: EdgeThemes.current.value),
+          metro: GlassLook.style.value == EdgeStyle.line),
       darkTheme: buildTheme(Brightness.dark,
           glass: GlassLook.style.value == EdgeStyle.glass,
-          inst: GlassLook.style.value == EdgeStyle.instrument,
-          mid: theme.isMid,
-          look: EdgeThemes.current.value),
+          metro: GlassLook.style.value == EdgeStyle.line,
+          mid: theme.isMid),
       themeMode: theme.materialThemeMode,
       locale: locale.locale, // null = follow the OS locale
       // First, so a 12-hour choice reaches the time pickers (see the delegate).

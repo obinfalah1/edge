@@ -78,7 +78,9 @@ class EcgEntryCard extends StatelessWidget {
     final l = AppLocalizations.of(c);
     return ActionCard(
       l?.ecgHeartScreener ?? 'Heart Screener',
-      l?.ecgEntryMeta ?? 'WHOOP MG · band-reported',
+      P.of(c).glass || P.of(c).metro
+          ? 'ECG from your band'
+          : (l?.ecgEntryMeta ?? 'WHOOP MG · band-reported'),
       l?.ecgOpen ?? 'Open',
       LucideIcons.activity,
       C.domHealth,
@@ -173,7 +175,9 @@ class _EcgHomeScreenState extends State<EcgHomeScreen> {
           ActionCard(
             l?.ecgTakeEcg ?? 'Take ECG',
             canTake
-                ? (l?.ecgEntryMeta ?? 'WHOOP MG · band-reported')
+                ? (P.of(c).glass || P.of(c).metro
+                    ? 'ECG from your band'
+                    : (l?.ecgEntryMeta ?? 'WHOOP MG · band-reported'))
                 : (l?.ecgNeedsMg ?? 'Take ECG needs a connected WHOOP MG.'),
             l?.ecgTakeEcg ?? 'Take ECG',
             LucideIcons.heartPulse,

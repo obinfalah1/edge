@@ -1,4 +1,4 @@
-// The chosen style (Original, Liquid Glass or Instrument): saved, and listened
+// The chosen style (Original, Liquid Glass or Line): saved, and listened
 // to by the app so a change rebuilds every screen through the theme (see
 // [EdgeLook]).
 import 'package:flutter/foundation.dart';
@@ -19,9 +19,9 @@ class GlassLook {
       if (e.name == s) return e;
     }
     // Before styles: the old Liquid Glass switch, if it was turned off,
-    // meant the original look. Otherwise start in Instrument.
+    // meant the original look. Otherwise start in Line.
     return Prefs.getBool('ui.liquid_glass', true)
-        ? EdgeStyle.instrument
+        ? EdgeStyle.line
         : EdgeStyle.original;
   }
 

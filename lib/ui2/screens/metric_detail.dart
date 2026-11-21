@@ -2188,7 +2188,7 @@ Widget detailLinkRow(BuildContext c, IconData icon, String title, String sub,
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(title,
                 style: F.body.copyWith(color: p.ink, fontWeight: FontWeight.w600)),
-            Text(sub, style: F.over.copyWith(color: p.ink3)),
+            Text(calm(p, sub), style: F.over.copyWith(color: p.ink3)),
           ]),
         ),
         Icon(LucideIcons.chevronRight, size: 18, color: p.ink3),
