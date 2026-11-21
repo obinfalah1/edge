@@ -28,7 +28,7 @@ jobs:
       - run: dart pub global activate flutterfire_cli 1.4.0
       - run: flutter pub get
       - name: Fajr alarm tests
-        run: flutter test test/fajr_alarm_test.dart test/band_timer_test.dart test/alarm_schedule_test.dart test/alarm_test.dart test/prayer_buzz_test.dart test/healthspan_test.dart test/coach_apple_test.dart
+        run: flutter test test/fajr_alarm_test.dart test/band_timer_test.dart test/alarm_schedule_test.dart test/alarm_test.dart test/prayer_buzz_test.dart test/healthspan_test.dart test/coach_apple_test.dart test/doctor_report_test.dart
       - name: Build unsigned iOS app
         run: flutter build ios --release --no-codesign --dart-define-from-file=.env
       - name: Strip Watch companion (can't survive per-user resigning)

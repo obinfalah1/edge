@@ -36,6 +36,7 @@ import 'investigate.dart';
 import 'metric_detail.dart';
 import 'wellness_screen.dart';
 import 'healthspan_screen.dart';
+import 'doctor_report_sheet.dart';
 import '../../l10n/personal_text.dart';
 
 /// A read this screen can live without. The wear block and the nap block are
@@ -1297,6 +1298,13 @@ class _HealthScreenState extends State<HealthScreen> with RevisionReload {
           tr(c, 'Healthspan', 'مدى الصحة'),
           tr(c, 'An estimated age from six habits, and what moves it', 'عمر تقديري من ست عادات، وما الذي يحرّكه'),
           () => go(c, const HealthspanScreen())),
+      const SizedBox(height: S.x3),
+      detailLinkRow(
+          c,
+          LucideIcons.fileText,
+          tr(c, 'Report for your doctor', 'تقرير لطبيبك'),
+          tr(c, 'A PDF of your numbers to share', 'ملف PDF بأرقامك للمشاركة'),
+          () => showDoctorReportSheet(c)),
 
       // The research charts, all behind one door.
       const SizedBox(height: S.x3),
