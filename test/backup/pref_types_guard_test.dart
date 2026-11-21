@@ -15,6 +15,7 @@ import 'package:openstrap_edge/data/backup_extras.dart';
 /// "file|expression|type" -> keys the call can read. The table must give each
 /// one that exact type. `*` as the file skips the file check.
 const _dynamicReads = <String, List<String>>{
+  'prayer_buzz.dart|p.prefKey|bool': ['prayer_buzz_on_dhuhr', 'prayer_buzz_on_asr', 'prayer_buzz_on_maghrib', 'prayer_buzz_on_isha'],
   'briefing.dart|_slotKey(period|string': ['ai.briefing.morning'],
   'ecg_guard_store.dart|guardKey(serial|bool': ['ecg.guard.S1'],
   'ecg_guard_store.dart|wristKey(serial|string': ['ecg.wrist.S1'],

@@ -35,6 +35,7 @@ import '../../state/alarm_schedule.dart';
 import '../../state/app_state.dart';
 import '../../state/clock_format.dart' show formatClock;
 import '../../state/fajr_alarm.dart' show FajrAlarmSettings;
+import '../../state/prayer_buzz.dart' show Prayer, PrayerBuzzSettings;
 import '../screens/home_screen.dart' show go, weekdayShortName;
 import '../screens/metric_detail.dart' show detailLinkRow;
 import '../ui2.dart';
@@ -234,6 +235,14 @@ class AlarmScreen extends StatelessWidget {
       onTestFajr: () async {
         if (await app.testFajrAlarm()) throw Exception(stockPattern);
       },
+      prayer: app.prayerBuzz,
+      prayerNext: app.prayerBuzzNext,
+      prayerToday: app.prayerTimesToday,
+      onSetPrayer: ({toggle, offsetMinutes, buzzCount}) async {
+        final onBandNow = await app.setPrayerBuzz(
+            toggle: toggle, offsetMinutes: offsetMinutes, buzzCount: buzzCount);
+        if (!onBandNow) throw Exception(notOnBand);
+      },
     );
   }
 }
@@ -285,6 +294,17 @@ class AlarmScreenView extends StatelessWidget {
   })? onSetFajr;
   final Future<void> Function()? onRefreshFajr, onTestFajr;
 
+  /// Prayer buzzes (prayer_buzz.dart): Dhuhr, Asr, Maghrib and Isha, each
+  /// with its own switch; separate from the Fajr alarm.
+  final PrayerBuzzSettings? prayer;
+  final ({DateTime at, Prayer prayer})? prayerNext;
+  final Map<Prayer, DateTime> prayerToday;
+  final Future<void> Function({
+    Prayer? toggle,
+    int? offsetMinutes,
+    int? buzzCount,
+  })? onSetPrayer;
+
   const AlarmScreenView({
     super.key,
     this.armedAt,
@@ -305,6 +325,10 @@ class AlarmScreenView extends StatelessWidget {
     this.onSetFajr,
     this.onRefreshFajr,
     this.onTestFajr,
+    this.prayer,
+    this.prayerNext,
+    this.prayerToday = const {},
+    this.onSetPrayer,
   });
 
   @override
@@ -364,6 +388,10 @@ class AlarmScreenView extends StatelessWidget {
                 ],
                 if (fajr != null) ...[
                   _fajrGroup(c, fajr!),
+                  const SizedBox(height: S.x3),
+                ],
+                if (prayer != null) ...[
+                  _prayerGroup(c, prayer!),
                   const SizedBox(height: S.x3),
                 ],
                 if (!connected)
@@ -510,6 +538,76 @@ class AlarmScreenView extends StatelessWidget {
             soft: true,
             onTap: () => _run(c, onTestFajr,
                 _fajrText('Test alarm set — the band buzzes in about a minute'))),
+      ],
+    ]);
+  }
+
+  /// The other four prayers: one switch each, the next buzz, and the two
+  /// shared numbers (minutes after the adhan, buzzes).
+  Widget _prayerGroup(BuildContext c, PrayerBuzzSettings s) {
+    final ar = Localizations.localeOf(c).languageCode == 'ar';
+    String t(String en, String arabic) => ar ? arabic : en;
+    final next = prayerNext;
+    Future<void> set({Prayer? toggle, int? off, int? n}) async {
+      if (onSetPrayer == null) return;
+      await onSetPrayer!(toggle: toggle, offsetMinutes: off, buzzCount: n);
+    }
+
+    return settingsGroup(c, t('Prayer buzzes', 'تنبيهات الصلاة'), [
+      for (final pr in Prayer.values)
+        SetRow(
+          switch (pr) {
+            Prayer.dhuhr => LucideIcons.sun,
+            Prayer.asr => LucideIcons.sunMedium,
+            Prayer.maghrib => LucideIcons.sunset,
+            Prayer.isha => LucideIcons.moonStar,
+          },
+          switch (pr) {
+            Prayer.dhuhr => C.yellow,
+            Prayer.asr => C.orange,
+            Prayer.maghrib => C.red,
+            Prayer.isha => C.indigo,
+          },
+          pr.label(ar),
+          sub: prayerToday[pr] == null ? '' : _hhmm(prayerToday[pr]!),
+          chevron: false,
+          trailing: Switch.adaptive(
+            value: s.isOn(pr),
+            onChanged: onSetPrayer == null
+                ? null
+                : (on) => _run(
+                    c,
+                    () => set(toggle: pr),
+                    on
+                        ? t('${pr.api} buzz on', 'تم تفعيل تنبيه ${pr.arabic}')
+                        : t('${pr.api} buzz off', 'تم إيقاف تنبيه ${pr.arabic}')),
+          ),
+          onTap: onSetPrayer == null
+              ? null
+              : () => _run(c, () => set(toggle: pr), null),
+        ),
+      if (s.anyOn) ...[
+        SetRow(LucideIcons.alarmClock, C.green, t('Next', 'التالي'),
+            value: next == null
+                ? t('Fetching prayer times…', 'جارٍ جلب مواقيت الصلاة…')
+                : '${next.prayer.label(ar)} · ${_hhmm(next.at)}',
+            chevron: false),
+        SetRow(LucideIcons.clock, C.blue,
+            t('Minutes after the adhan', 'دقائق بعد الأذان'),
+            value: '${s.offsetMinutes} ${t('min', 'د')}',
+            chevron: false,
+            onTap: () => _pickNumber(
+                c,
+                t('Minutes after the adhan', 'دقائق بعد الأذان'),
+                const [0, 5, 10, 15, 20, 30, 45, 60],
+                (m) => '$m ${t('min', 'د')}',
+                (m) => set(off: m))),
+        SetRow(LucideIcons.vibrate, C.orange, t('Buzzes', 'عدد الاهتزازات'),
+            value: '${s.buzzCount}',
+            chevron: false,
+            onTap: () => _pickNumber(c, t('Buzzes', 'عدد الاهتزازات'),
+                [for (var i = 1; i <= 10; i++) i], (n) => '$n',
+                (n) => set(n: n))),
       ],
     ]);
   }

@@ -87,6 +87,7 @@ import '../data/auto_backup.dart' as backup
 import 'alarm_schedule.dart';
 import 'band_timer.dart';
 import 'fajr_alarm.dart';
+import 'prayer_buzz.dart';
 import 'derive_coordinator.dart';
 import 'gesture_controller.dart';
 import 'live_stream_controller.dart';
@@ -5368,7 +5369,9 @@ class AppState extends ChangeNotifier {
       _log('[alarm] schedule load failed: $e');
     }
     try {
-      _readFajrState(await SharedPreferences.getInstance());
+      final prefs = await SharedPreferences.getInstance();
+      _readFajrState(prefs);
+      _readPrayerState(prefs);
     } catch (e) {
       _log('[fajr] state load failed: $e');
     }
@@ -5456,6 +5459,63 @@ class AppState extends ChangeNotifier {
       await _armNextAlarmOccurrence(force: true);
     }
     return ok;
+  }
+
+  // ── Prayer buzzes (prayer_buzz.dart) ─────────────────────────────────────
+  // Dhuhr, Asr, Maghrib and Isha, each with its own switch. Separate from the
+  // Fajr alarm above; one more source for the strap's single slot.
+
+  PrayerBuzzSettings _prayer = const PrayerBuzzSettings();
+  PrayerBuzzSettings get prayerBuzz => _prayer;
+
+  ({DateTime at, Prayer prayer})? _prayerNext;
+
+  /// The next prayer buzz the cache knows about (null when all off/unknown).
+  ({DateTime at, Prayer prayer})? get prayerBuzzNext => _prayerNext;
+
+  /// Today's cached times for the four prayers (missing until fetched).
+  Map<Prayer, DateTime> _prayerToday = const {};
+  Map<Prayer, DateTime> get prayerTimesToday => _prayerToday;
+
+  void _readPrayerState(SharedPreferences prefs) {
+    _prayer = PrayerBuzzSettings.load(prefs);
+    final now = DateTime.now();
+    final cache = PrayerTimes.readCache(prefs);
+    _prayerNext = nextPrayerBuzz(cache, _prayer, now);
+    final today = cache[FajrTimes.dayKey(now)] ?? const {};
+    _prayerToday = {
+      for (final p in Prayer.values)
+        if (today[p.name] != null)
+          p: DateTime.fromMillisecondsSinceEpoch(today[p.name]! * 1000),
+    };
+  }
+
+  /// Change the prayer buzzes and re-arm when connected. Turning the first
+  /// one on fetches the times (asking for location the first time). Returns
+  /// false when the band does not hold the result yet.
+  Future<bool> setPrayerBuzz({
+    Prayer? toggle,
+    int? offsetMinutes,
+    int? buzzCount,
+  }) async {
+    for (var d = _disableInFlight; d != null; d = _disableInFlight) {
+      await d;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    final was = _prayer;
+    var next = toggle == null ? was : was.toggle(toggle);
+    next = next.copyWith(offsetMinutes: offsetMinutes, buzzCount: buzzCount);
+    await next.save(prefs);
+    if (next.anyOn &&
+        (!was.anyOn || PrayerTimes.needsRefresh(prefs, DateTime.now()))) {
+      final ok =
+          await PrayerTimes.refresh(prefs, useGps: true, askPermission: true);
+      if (!ok) _log('[prayer] prayer-time fetch failed; using the cache.');
+    }
+    _readPrayerState(prefs);
+    notifyListeners();
+    if (!isConnected) return false;
+    return _armNextAlarmOccurrence(force: true);
   }
 
   /// Arm the band's alarm one minute from now with the Fajr buzz pattern, so
@@ -5630,6 +5690,7 @@ class AppState extends ChangeNotifier {
       // Fajr alarm: top up the prayer-time cache when it runs low (GPS only
       // if permission was already given — never a prompt from a connect).
       await refreshFajrTimesIfNeeded(prefs, useGps: true);
+      await refreshPrayerTimesIfNeeded(prefs, useGps: true);
       final from = alarmRearmFrom(DateTime.now(), firedEpoch);
       final fajr = loadFajrPlan(prefs, from);
       _readFajrState(prefs);
@@ -5640,6 +5701,7 @@ class AppState extends ChangeNotifier {
         now: from,
         fajr: fajr,
         timer: loadBandTimerPlan(prefs, from),
+        prayers: loadPrayerBuzzPlan(prefs, from),
       );
       if (result.disabled) {
         // Every weekday got disabled since the last arm — the strap doesn't
@@ -6293,6 +6355,8 @@ class AppState extends ChangeNotifier {
     // on the very next connect.
     await _fajr.copyWith(enabled: false).save(prefs);
     _readFajrState(prefs);
+    await _prayer.copyWith(enabled: const {}).save(prefs);
+    _readPrayerState(prefs);
     notifyListeners();
     // Nothing is scheduled now, so the 7pm "no alarm set for tonight" check
     // armed earlier today must go too.

@@ -42,6 +42,7 @@ import '../notify/notification_event.dart';
 import '../state/alarm_schedule.dart';
 import '../state/band_timer.dart';
 import '../state/fajr_alarm.dart';
+import '../state/prayer_buzz.dart';
 import 'band_ownership.dart';
 import 'high_freq_wake_window.dart';
 import 'reset_gate.dart';
@@ -297,6 +298,7 @@ Future<void> rearmHeadlessAlarm(BleEngine engine, PairedDevice paired) async {
     // Fajr alarm: top the prayer-time cache up if it is running out (last
     // stored location — no GPS from the background), then arm from it.
     await refreshFajrTimesIfNeeded(prefs, useGps: false);
+    await refreshPrayerTimesIfNeeded(prefs, useGps: false);
     final fajr = loadFajrPlan(prefs, DateTime.now());
     await headlessArmAndConfirm(
       () => armNextScheduledOccurrence(
@@ -305,6 +307,7 @@ Future<void> rearmHeadlessAlarm(BleEngine engine, PairedDevice paired) async {
         currentArmedEpoch: persistedAlarmEpoch(prefs, remoteId),
         fajr: fajr,
         timer: loadBandTimerPlan(prefs, DateTime.now()),
+        prayers: loadPrayerBuzzPlan(prefs, DateTime.now()),
       ),
       LocalDb.alarmSetConfirmedSince,
       remoteId: remoteId,

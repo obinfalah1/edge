@@ -24,6 +24,8 @@ const _mustTravel = {
   // Fajr alarm: the user's on/off and numbers travel; the times are refetched.
   'fajr_alarm_enabled', 'fajr_alarm_offset_min', 'fajr_alarm_buzz_count',
   'fajr_alarm_pause_steps',
+  'prayer_buzz_on_dhuhr', 'prayer_buzz_on_asr', 'prayer_buzz_on_maghrib',
+  'prayer_buzz_on_isha', 'prayer_buzz_offset_min', 'prayer_buzz_count',
   'coach_api', 'coach_model', 'coach_timeout_seconds',
   'coach_use_chatgpt',
   'ai_morning_enabled', 'ai_morning_min', 'ai_evening_enabled', 'ai_evening_min',
@@ -79,7 +81,7 @@ const _mustStay = {
   'smart_wake_fired_epoch',
   'fajr_alarm_cache_v1', 'fajr_alarm_fetched_at_ms', 'fajr_alarm_coords_v1',
   'fajr_alarm_coords_source', 'band_timer_epoch',
-  'band_timer_buzz_count',
+  'band_timer_buzz_count', 'prayer_buzz_cache_v1', 'prayer_buzz_fetched_at_ms',
   'live.session_draft', 'live_session_checkpoint', 'telemetry_outbox',
   // Permission and grant are per install.
   'health_weight_perm_asked', 'health_weight_grant_seen',
@@ -108,6 +110,7 @@ const _dynamicExamples = {
 // Empty lists are delegating writers, audited at their owning call sites.
 const _indirectKeys = <String, List<String>>{
   'lib/ai/briefing.dart:_slotKey(b.period)': ['ai.briefing.morning'],
+  'lib/state/prayer_buzz.dart:p.prefKey': ['prayer_buzz_on_dhuhr', 'prayer_buzz_on_asr', 'prayer_buzz_on_maghrib', 'prayer_buzz_on_isha'],
   'lib/ecg/ecg_guard_store.dart:guardKey(serial)': ['ecg.guard.MG123'],
   'lib/ecg/ecg_guard_store.dart:wristKey(serial)': ['ecg.wrist.MG123'],
   'lib/ecg/ecg_guard_store.dart:maverickKey(serial)': ['ecg.maverick.MG123'],

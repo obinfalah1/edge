@@ -13,6 +13,7 @@ import '../ble/ble_engine.dart';
 import '../ble/ble_state.dart' show AlarmConfirmation;
 import 'band_timer.dart' show BandTimerPlan;
 import 'fajr_alarm.dart' show FajrPlan;
+import 'prayer_buzz.dart' show PrayerBuzzPlan;
 
 /// The physical band that received the persisted SET_ALARM.
 const kAlarmRemoteId = 'alarm_remote_id';
@@ -324,22 +325,25 @@ Future<AlarmArmResult> armNextScheduledOccurrence({
   DateTime? now,
   FajrPlan? fajr,
   BandTimerPlan? timer,
+  PrayerBuzzPlan? prayers,
 }) async {
   final weekly = nextAlarmOccurrence(schedule, now ?? DateTime.now());
-  final fajrNext = fajr?.next;
-  var useFajr =
-      fajrNext != null && (weekly == null || fajrNext.isBefore(weekly));
-  var next = useFajr ? fajrNext : weekly;
-  // The band timer (band_timer.dart) borrows the slot only while it ends
-  // first; with no timer running this is exactly the weekly-vs-Fajr choice.
-  final timerNext = timer?.next;
-  final useTimer =
-      timerNext != null && (next == null || timerNext.isBefore(next));
-  if (useTimer) {
-    next = timerNext;
-    useFajr = false;
+  // Every source for the strap's one slot; the earliest wins. With only
+  // weekly + Fajr this is exactly the old weekly-vs-Fajr choice; the band
+  // timer and the prayer buzzes (prayer_buzz.dart) borrow the slot only while
+  // they come first. Ties keep the earlier-listed source.
+  DateTime? next = weekly;
+  List<int>? custom;
+  for (final (at, haptics) in <(DateTime?, List<int>?)>[
+    (fajr?.next, fajr?.haptics),
+    (prayers?.next, prayers?.haptics),
+    (timer?.next, timer?.haptics),
+  ]) {
+    if (at != null && (next == null || at.isBefore(next))) {
+      next = at;
+      custom = haptics;
+    }
   }
-  final custom = useTimer ? timer!.haptics : (useFajr ? fajr!.haptics : null);
   if (next == null) {
     // Nothing enabled. Toggling every weekday off individually (rather than
     // an explicit cancel-all) must not leave the strap holding its last arm
