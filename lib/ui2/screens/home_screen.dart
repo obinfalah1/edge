@@ -1666,7 +1666,8 @@ class _Dial extends StatelessWidget {
                 solid: r.measured,
                 background: p.card),
       ),
-      Icon(r.icon, size: icon, color: r.ink(p)),
+      // Glass: the ring stands alone; its name is right under it.
+      if (!p.glass) Icon(r.icon, size: icon, color: r.ink(p)),
     ]);
   }
 }
@@ -1808,9 +1809,14 @@ class _RingText extends StatelessWidget {
           p.glass && r.calibrating
               ? 'Learning'
               : presentationText(AppLocalizations.of(c), r.value),
+          // Glass: "Learning" is set in the figure face too, so the three
+          // rings read as three equal headings.
           style: r.measured
               ? F.n24.copyWith(color: r.provisional ? p.ink3 : p.ink)
-              : F.body.copyWith(color: p.ink2),
+              : p.glass
+                  ? F.t2.copyWith(
+                      color: p.ink, fontFamily: LineTok.display, fontWeight: FontWeight.w500)
+                  : F.body.copyWith(color: p.ink2),
           textAlign: align,
         ),
         // No reserved caption lines: an empty caption takes no space, so the

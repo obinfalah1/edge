@@ -679,8 +679,14 @@ Sky _toned(Sky dark, EdgeTone tone) {
     EdgeTone.dark => dark,
     EdgeTone.mid => Sky(Color.lerp(dark.base, _midLift, .72)!,
         [for (final f in dark.fields) Color.lerp(f, _midLift, .3)!]),
-    EdgeTone.light => Sky(Color.lerp(dark.base, _lightPaper, .94)!,
-        [for (final f in dark.fields) Color.lerp(f, _lightPaper, .72)!]),
+    // Light: the mockup's own pastels (mint, mist blue, lilac, sea glass)
+    // on a cool off-white, not the dark colours washed out to grey.
+    EdgeTone.light => const Sky(_lightPaper, [
+        Color(0xFFCFE9E1),
+        Color(0xFFD9E2F2),
+        Color(0xFFE6DDF3),
+        Color(0xFFD6EAF0),
+      ]),
   };
   // The contrast guard: a field may be as colourful as it likes, but never
   // so bright (light ink) or so dark (dark ink) that the ink on the glass

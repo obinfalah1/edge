@@ -1904,8 +1904,8 @@ class MetricRow extends StatelessWidget {
     final big = bigText(c);
     final valueText = Text(
       value,
-      style: p.metro
-          ? F.n17.copyWith(color: p.ink)
+      style: p.metro || p.glass
+          ? F.n24.copyWith(color: p.ink)
           : F.body.copyWith(color: p.ink, fontWeight: FontWeight.w600),
       // At large text the value has a line of its own (see below), and a
       // value that is a WORD ('What applies to you' → a phrase) can still be
