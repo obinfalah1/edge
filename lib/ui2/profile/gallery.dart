@@ -210,6 +210,18 @@ Map<String, Widget> componentCases() => {
           child: EcgReadingRow(reading: _ecgDemoReading, onTap: () {})),
       'whoop_firmware_warning': const WhoopFirmwareWarning(),
       'help_entry': const HelpEntry(topic: GuideTopic.today),
+      'header_actions': const HeaderActions(topic: GuideTopic.today, accent: C.domHome),
+      'row_group': RowGroup([
+        ListRow(icon: LucideIcons.heart, title: 'Resting heart rate', sub: 'Overnight', value: '67', unit: 'bpm', onTap: () {}),
+        ListRow(icon: LucideIcons.footprints, title: 'Steps', sub: '840 to your goal of 8,000', value: '7,160', onTap: () {}),
+      ]),
+      'list_row': ListRow(title: 'Minutes after Fajr', detail: '15 min', onTap: () {}),
+      'track_row': Surface(
+          pad: EdgeInsets.zero,
+          child: TrackRow(title: 'Recovery', value: '2', unit: 'of 14 nights', fill: 2 / 14, stops: 14, color: C.green,
+              note: 'Learning your normal. Scored from night 15.')),
+      'primary_button': PrimaryButton('Start a workout', icon: LucideIcons.plus, onTap: () {}),
+      'secondary_button': SecondaryButton('Log a workout', onTap: () {}),
       'signal': const SignalCard(
           LucideIcons.heartPulse, C.blue, 'Resting heart rate', '52',
           unit: 'bpm', sub: '4 BELOW YOUR BASELINE'),

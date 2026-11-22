@@ -993,7 +993,12 @@ class Hypnogram extends CustomPainter implements GuidePlot {
               (p.dark ? _darkTheme : _lightTheme)[s.index]),
       };
 
-  static double _worst(P p, Color c) => [p.bg, p.card, p.card2]
+  // Glass pages and cards are see-through, so their colours carry no contrast
+  // of their own: measure against the solid page and the worst glass floor
+  // instead, or every stage is pushed to white.
+  static double _worst(P p, Color c) => (p.glass
+          ? [p.bgSolid, p.floor]
+          : [p.bg, p.card, p.card2])
       .map((b) => P.contrast(c, b))
       .reduce(min);
 

@@ -498,8 +498,10 @@ class ChartPanel extends StatelessWidget {
 
   Widget _caption(BuildContext c, P p) {
     final l = AppLocalizations.of(c);
-    final latest = l?.chartPanelLatest ?? 'LATEST';
-    final selected = l?.chartPanelSelected ?? 'SELECTED';
+    // Line and Glass: sentence case, no caps labels.
+    final rf = p.metro || p.glass;
+    final latest = rf ? 'Latest' : (l?.chartPanelLatest ?? 'LATEST');
+    final selected = rf ? 'At' : (l?.chartPanelSelected ?? 'SELECTED');
     final measure = F.over.copyWith(fontWeight: FontWeight.w700);
     final style = measure.copyWith(color: scrubbed ? color : p.ink2);
     final scaler = MediaQuery.textScalerOf(c);
@@ -536,7 +538,7 @@ class ChartPanel extends StatelessWidget {
       if (!timeSpan.contains(now)) height = math.max(height, tallest([now]));
       return ConstrainedBox(
         constraints: BoxConstraints(minHeight: height),
-        child: Text('${scrubbed ? selected : latest} · $now',
+        child: Text(rf ? '${scrubbed ? selected : latest}, $now' : '${scrubbed ? selected : latest} · $now',
             key: captionKey, style: style),
       );
     });
@@ -851,7 +853,7 @@ class Section extends StatelessWidget {
                       child: Text(
                         action!,
                         style: F.cap.copyWith(
-                          color: p.on(C.blue),
+                          color: p.metro || p.glass ? p.on(p.tint) : p.on(C.blue),
                           fontWeight: FontWeight.w600,
                         ),
                         maxLines: 1,
@@ -1685,7 +1687,8 @@ class StatusCard extends StatelessWidget {
             const SizedBox(height: S.x3),
             _Cta(
               presentationText(AppLocalizations.of(c), fix),
-              p.on(C.blue),
+              // Line and Glass: the style's one accent, not system blue.
+              p.metro || p.glass ? p.on(p.tint) : p.on(C.blue),
               arrow: onFix != null,
             ),
           ],
@@ -2540,6 +2543,53 @@ class _SubTabsState extends State<SubTabs> {
     final index = widget.index;
     final disabled = widget.disabled;
     final color = widget.color;
+    // Glass and Line at ordinary text sizes: equal segments that always fit,
+    // like an iOS segmented control. Nothing is cut off the right edge.
+    if ((p.glass || p.metro) && !bigText(c) && items.length <= 5) {
+      return Container(
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(color: p.card2, borderRadius: R.rPill),
+        child: Row(children: [
+          for (var i = 0; i < items.length; i++)
+            Expanded(
+              child: Semantics(
+                selected: i == index,
+                inMutuallyExclusiveGroup: true,
+                child: Pressable(
+                  onTap: disabled.contains(i)
+                      ? null
+                      : () {
+                          HapticFeedback.selectionClick();
+                          widget.onTap(i);
+                        },
+                  child: AnimatedContainer(
+                    duration: motion(c, Motion.base),
+                    height: 36,
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(horizontal: S.x1),
+                    decoration: BoxDecoration(
+                      color: i == index ? p.cardSolid : const Color(0x00000000),
+                      borderRadius: R.rPill,
+                      boxShadow: i == index ? p.el(1) : null,
+                    ),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(items[i],
+                          maxLines: 1,
+                          style: F.cap.copyWith(
+                            color: disabled.contains(i)
+                                ? p.ink3
+                                : (i == index ? p.ink : p.ink2),
+                            fontWeight: i == index ? FontWeight.w600 : FontWeight.w500,
+                          )),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ]),
+      );
+    }
     final bar = SizedBox(
       height: MediaQuery.textScalerOf(c).scale(S.tap),
       // The fifth tab is off the edge on every phone we ship to — at 360 pt

@@ -830,6 +830,24 @@ class _MetricDetailState extends State<MetricDetail> {
     final p = P.of(c);
     final n = _offered(d);
     final note = _lockedNote(c, d);
+    // Line and Glass: never a choice of one. While only the shortest range
+    // exists, show how far along the next one is instead of a lone segment.
+    if ((p.metro || p.glass) && n == 1 && _windows.length > 1) {
+      final need = _windows[1], have = d.daysAvailable.clamp(0, _windows[1]);
+      final left = need - have;
+      return Surface(
+        pad: EdgeInsets.zero,
+        child: TrackRow(
+          title: 'Days so far',
+          value: '$have',
+          unit: 'of $need',
+          fill: have / need,
+          stops: need,
+          color: p.on(color),
+          note: 'The trend chart starts after $need days. $left to go.',
+        ),
+      );
+    }
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       SubTabs(_labelsOf(c).sublist(0, n), _range.clamp(0, n - 1),
           (i) => setState(() => (_range = i, _pick = null, _device = null)),
@@ -1031,9 +1049,17 @@ class _MetricDetailState extends State<MetricDetail> {
         const SizedBox(height: S.x5),
         if (!_failed) investigateRow(c, () => go(c, Investigate(widget.metricKey))),
       ] else ...[
+        // Line and Glass with only the shortest range: the reading leads, and
+        // the "days so far" progress sits under it.
+        if ((P.of(c).metro || P.of(c).glass) && _offered(d) == 1) ...[
+          _hero(c, spec, all, series, vals, win, d.wear, d.algoBreaks, d),
+          const SizedBox(height: S.x5),
+          _ranges(c, d, spec.color),
+        ] else ...[
         _ranges(c, d, spec.color),
         const SizedBox(height: S.x5),
         _hero(c, spec, all, series, vals, win, d.wear, d.algoBreaks, d),
+        ],
         // Today's count against the goal set on this screen's own edit
         // affordance — a trend average has no goal to be measured against, so
         // this stays win == 1 only, same gate as the Breakdown link below.
@@ -2103,11 +2129,15 @@ class DayNav extends StatelessWidget {
   final List<String> days;
   final ValueChanged<String> onDay;
 
+  /// A night stepper (Sleep): the latest one reads "Last night".
+  final bool night;
+
   const DayNav({
     super.key,
     required this.day,
     required this.days,
     required this.onDay,
+    this.night = false,
   });
 
   @override
@@ -2144,7 +2174,7 @@ class DayNav extends StatelessWidget {
                   l?.metricDetailChooseDayShowing(dayNavLabel(day, l)) ??
                   'Choose a day. Showing ${dayNavLabel(day, l)}',
               child: Text(
-                dayNavLabel(day, l),
+                night && (_dayBehind(day) ?? 1) <= 0 ? 'Last night' : dayNavLabel(day, l),
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -2161,11 +2191,11 @@ class DayNav extends StatelessWidget {
 /// [DayNav] and the gap under it, spread into a `detailScaffold` body — or
 /// nothing at all when there is only one day to look at.
 List<Widget> dayNavRow(
-        String? day, List<String> days, ValueChanged<String> onDay) =>
+        String? day, List<String> days, ValueChanged<String> onDay, {bool night = false}) =>
     days.length < 2
         ? const []
         : [
-            DayNav(day: day, days: days, onDay: onDay),
+            DayNav(day: day, days: days, onDay: onDay, night: night),
             const SizedBox(height: S.x3),
           ];
 
@@ -2204,7 +2234,17 @@ Widget detailLinkRow(BuildContext c, IconData icon, String title, String sub,
 ///
 /// The identifier stays `investigateRow` to match `investigate.dart` and the
 /// `investigate_row` gallery key; only the string changed.
-Widget investigateRow(BuildContext c, VoidCallback onTap) => detailLinkRow(
+Widget investigateRow(BuildContext c, VoidCallback onTap) =>
+    P.of(c).metro || P.of(c).glass
+        // Line and Glass: the same door as a list row, in plain words.
+        ? RowGroup([
+            ListRow(
+                icon: LucideIcons.info,
+                title: 'The numbers behind it',
+                sub: 'Every reading and how it was worked out',
+                onTap: onTap),
+          ])
+        : detailLinkRow(
     c,
     LucideIcons.cpu,
     AppLocalizations.of(c)?.metricDetailNerdStatsTitle ?? 'Nerd stats',

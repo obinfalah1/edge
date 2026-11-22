@@ -131,6 +131,19 @@ class SetRow extends StatelessWidget {
                       fontFamily: LineTok.display,
                       fontWeight: FontWeight.w600)),
             )
+          else if ((p.metro || p.glass) && !danger)
+          // Line and Glass: one icon tone for every settings row (neutral in
+          // Line, the accent in Glass). Colour is kept for data and danger.
+          Container(
+            width: 32,
+            height: 32,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+                color: p.glass ? p.wash(p.tint) : p.card2, borderRadius: R.rSm),
+            child: glyph != null
+                ? glyph!(p.glass ? p.on(p.tint) : p.ink2)
+                : Icon(icon, size: 16, color: p.glass ? p.on(p.tint) : p.ink2),
+          )
           else
           Container(
             width: 32,
@@ -153,7 +166,11 @@ class SetRow extends StatelessWidget {
                     style: F.cap.copyWith(
                         color: p.ink3, fontWeight: FontWeight.w600)),
               if (sub.isNotEmpty)
-                Text(calm(p, sub), style: F.over.copyWith(color: p.ink3)),
+                Text(calm(p, sub),
+                    // Line and Glass: a sub is one line; the detail is inside.
+                    maxLines: (p.metro || p.glass) && !bigText(c) ? 1 : null,
+                    overflow: (p.metro || p.glass) && !bigText(c) ? TextOverflow.ellipsis : null,
+                    style: (p.metro || p.glass) ? F.cap.copyWith(color: p.ink3) : F.over.copyWith(color: p.ink3)),
             ]),
           ),
           // THE ROW RULE (see MetricRow): the title is the only flexible part,

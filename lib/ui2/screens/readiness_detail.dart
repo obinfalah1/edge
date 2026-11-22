@@ -254,6 +254,60 @@ class _ReadinessDetailState extends State<ReadinessDetail> {
             final bannerShowsDiag = d.heldOverNight == null &&
                 (needMessageFromNote(note) != null ||
                     whyFromNote(note) == null);
+            // Line and Glass, while your normal is still being learned: the
+            // same nights-so-far track Today shows, and what Recovery is, in
+            // two plain sentences. Every other absence keeps its card.
+            final learn = RegExp(r'have=(\d+),need=(\d+)').firstMatch(note ?? '');
+            if ((p.metro || p.glass) && learn != null && d.heldOverNight == null) {
+              final have = int.parse(learn.group(1)!), need = int.parse(learn.group(2)!);
+              return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                if (p.glass)
+                  Surface(
+                    child: Row(children: [
+                      SizedBox(
+                          width: 80,
+                          height: 80,
+                          child: CustomPaint(
+                              painter: SegmentRing(have, need, p.on(C.green), p.track))),
+                      const SizedBox(width: S.x4),
+                      Expanded(
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Text.rich(TextSpan(children: [
+                            TextSpan(text: '$have', style: F.n24.copyWith(color: p.ink)),
+                            TextSpan(text: ' of $need nights', style: F.cap.copyWith(color: p.ink3)),
+                          ])),
+                          Text('Your first score shows on night ${need + 1}.',
+                              style: F.cap.copyWith(color: p.ink3)),
+                        ]),
+                      ),
+                    ]),
+                  )
+                else
+                Surface(
+                  pad: EdgeInsets.zero,
+                  child: TrackRow(
+                    title: 'Nights so far',
+                    value: '$have',
+                    unit: 'of $need',
+                    fill: need == 0 ? 0 : have / need,
+                    stops: need,
+                    color: p.metro ? p.on(LineTok.green) : p.on(C.green),
+                    note: 'Your first score shows on night ${need + 1}.',
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(S.x1, S.x3, S.x1, 0),
+                  child: Text(
+                      'Recovery compares last night\'s HRV and resting heart rate '
+                      'with your normal. Your normal needs $need nights with the band.',
+                      style: F.body.copyWith(color: p.ink2)),
+                ),
+                if (d.absentDiag != null)
+                  Section(
+                      l?.readinessDetailWhatWasMissing ?? 'What was missing',
+                      _absence(c, p, d.absentDiag!, fallbackReason: null)),
+              ]);
+            }
             return Column(children: [
               StatusCard.forMetric(
                       l?.readinessDetailNotScoredTitle ??

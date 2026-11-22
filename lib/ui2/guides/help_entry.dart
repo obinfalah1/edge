@@ -7,6 +7,7 @@ import '../../state/app_state.dart';
 import '../ui2.dart';
 import 'guide_catalogue.dart';
 import 'help_screen.dart';
+import '../profile/profile.dart' show ProfileAvatar;
 
 export 'guide_catalogue.dart' show GuideTopic;
 
@@ -30,8 +31,9 @@ class HelpEntry extends StatelessWidget {
     final label = (AppLocalizations.of(context) ??
             lookupAppLocalizations(const Locale('en')))
         .helpLookingForSomething;
-    // Glass and Line: a field you can see is tappable, not a grey line of
-    // text at the foot of the page. Same destination.
+    // Glass and Line: search lives in the title row ([HeaderActions]), one
+    // tap from the top of every tab, so the foot of the page carries nothing.
+    if (p.glass || p.metro) return const SizedBox.shrink();
     if (p.glass || p.metro) {
       return Padding(
         padding: const EdgeInsets.only(top: S.x4),
@@ -80,4 +82,39 @@ class HelpEntry extends StatelessWidget {
       ),
     ),
   );
+}
+
+
+/// The top-right of a tab: search (Line and Glass) and the profile avatar.
+/// Search opens the same feature search the foot of the page used to.
+class HeaderActions extends StatelessWidget {
+  final GuideTopic topic;
+  final Color accent;
+  const HeaderActions({super.key, required this.topic, required this.accent});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = P.of(context);
+    if (!(p.glass || p.metro)) return ProfileAvatar(accent: accent);
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Pressable(
+        semanticLabel: 'Search features',
+        onTap: () {
+          final band = bandGenerationOf(context.read<AppState>().paired);
+          Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => HelpScreen(topic: topic, band: band)));
+        },
+        child: Container(
+          width: 40,
+          height: 40,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+              shape: BoxShape.circle, color: p.card, border: Border.all(color: p.line)),
+          child: Icon(LucideIcons.search, size: 18, color: p.ink2),
+        ),
+      ),
+      const SizedBox(width: S.x2),
+      ProfileAvatar(accent: accent),
+    ]);
+  }
 }

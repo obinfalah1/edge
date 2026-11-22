@@ -271,6 +271,98 @@ class _MoreSettingsState extends State<MoreSettings>
   }
 }
 
+/// Line and Glass: the icon choice on its own screen, one tap below
+/// Settings. It keeps its own selection so the ring moves as you pick.
+class _IconScreen extends StatefulWidget {
+  final AppIconChoice chosen;
+  final ValueChanged<AppIconChoice>? onPick;
+  const _IconScreen({required this.chosen, this.onPick});
+  @override
+  State<_IconScreen> createState() => _IconScreenState();
+}
+
+class _IconScreenState extends State<_IconScreen> {
+  late AppIconChoice _chosen = widget.chosen;
+  @override
+  Widget build(BuildContext c) {
+    final p = P.of(c);
+    return Scaffold(
+      backgroundColor: p.bg,
+      body: SafeArea(
+        child: Column(children: [
+          const Padding(
+              padding: EdgeInsets.symmetric(horizontal: S.x4), child: NavBar('App icon')),
+          Expanded(
+            child: ListView(padding: const EdgeInsets.all(S.x4), children: [
+              Text('iPhone will ask you to confirm each change.',
+                  style: F.cap.copyWith(color: p.ink3)),
+              const SizedBox(height: S.x4),
+              Surface(
+                child: Wrap(spacing: S.x3, runSpacing: S.x3, children: [
+                  for (final choice in AppIconChoice.values)
+                    Column(mainAxisSize: MainAxisSize.min, children: [
+                      _IconChoice(
+                        choice: choice,
+                        selected: choice == _chosen,
+                        onTap: widget.onPick == null
+                            ? null
+                            : () {
+                                selectHaptic();
+                                setState(() => _chosen = choice);
+                                widget.onPick!(choice);
+                              },
+                      ),
+                      const SizedBox(height: S.x1),
+                      Text(choice.label, style: F.over.copyWith(color: p.ink3)),
+                    ]),
+                ]),
+              ),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Line and Glass: the two community asks Today used to carry, kept where
+/// you go looking for them.
+class _CommunityScreen extends StatelessWidget {
+  const _CommunityScreen();
+  @override
+  Widget build(BuildContext c) {
+    final p = P.of(c);
+    final l = AppLocalizations.of(c);
+    return Scaffold(
+      backgroundColor: p.bg,
+      body: SafeArea(
+        child: Column(children: [
+          const Padding(
+              padding: EdgeInsets.symmetric(horizontal: S.x4), child: NavBar('Community')),
+          Expanded(
+            child: ListView(padding: const EdgeInsets.all(S.x4), children: [
+              RowGroup([
+                ListRow(
+                  icon: LucideIcons.messageCircle,
+                  title: l?.nudgeDiscordCta ?? 'Join Discord',
+                  sub: 'Other OpenStrap users, bugs and ideas',
+                  onTap: () => open3rdPartyLink(kDiscordUrl),
+                ),
+                ListRow(
+                  icon: LucideIcons.heart,
+                  title: l?.nudgeDonateCta ?? 'Support the project',
+                  sub: 'It is free and open source, with no subscription',
+                  onTap: () => open3rdPartyLink(kSponsorUrl),
+                ),
+              ]),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
 /// Pick the home-screen icon, with both options drawn so the choice is made by
 /// looking rather than by reading a word.
 ///
@@ -720,6 +812,8 @@ class MoreSettingsView extends StatelessWidget {
     final l = AppLocalizations.of(c);
     final on = l?.stateOn ?? 'On';
     final off = l?.stateOff ?? 'Off';
+    // Line and Glass: plainer names and one-line subs (the detail is inside).
+    final rf = p.metro || p.glass;
     return Scaffold(
       backgroundColor: p.bg,
       body: SafeArea(
@@ -738,18 +832,22 @@ class MoreSettingsView extends StatelessWidget {
                 settingsGroup(c, l?.settingsGroupTheBand ?? 'The band', [
                   SetRow(LucideIcons.alarmClock, C.orange,
                       l?.settingsAlarmRowTitle ?? 'Alarm',
-                      sub: l?.settingsAlarmRowSub ??
-                          'Buzzes on your wrist, on the band’s own clock',
+                      sub: rf
+                          ? 'Fajr, prayer buzzes and the weekly alarm'
+                          : (l?.settingsAlarmRowSub ??
+                              'Buzzes on your wrist, on the band’s own clock'),
                       onTap: onAlarm),
                   // Off by default — an existing user did not ask their band
                   // to start buzzing mid-workout. The target-zone row below
                   // only appears once this is on; a target for an alert
                   // that's off is furniture, same rule as battery/water above.
                   SetRow(LucideIcons.heartPulse, C.red,
-                      l?.settingsZoneAlertRowTitle ?? 'HR zone alert',
-                      sub: l?.settingsZoneAlertRowSub ??
-                          'Buzz when your heart rate crosses into or out of '
-                              'the target zone during a live workout',
+                      rf ? 'Heart rate zone alert' : (l?.settingsZoneAlertRowTitle ?? 'HR zone alert'),
+                      sub: rf
+                          ? 'Buzz when you leave your zone in a workout'
+                          : (l?.settingsZoneAlertRowSub ??
+                              'Buzz when your heart rate crosses into or out of '
+                                  'the target zone during a live workout'),
                       value: zoneAlertEnabled ? on : off,
                       chevron: false,
                       onTap: onToggleZoneAlert),
@@ -800,18 +898,22 @@ class MoreSettingsView extends StatelessWidget {
                 // them, so nothing needs a sub-line listing its contents.
                 settingsGroup(c, l?.settingsGroupApp ?? 'App', [
                   SetRow(LucideIcons.bell, C.blue,
-                      l?.settingsManageNotificationsRowTitle ??
-                          'Manage notifications',
-                      sub: l?.settingsManageNotificationsRowSub ??
-                          'What may interrupt you, quiet hours, and off '
-                              'switches for all of them',
+                      rf ? 'Notifications' : (l?.settingsManageNotificationsRowTitle ??
+                          'Manage notifications'),
+                      sub: rf
+                          ? 'What may interrupt you, and quiet hours'
+                          : (l?.settingsManageNotificationsRowSub ??
+                              'What may interrupt you, quiet hours, and off '
+                                  'switches for all of them'),
                       onTap: onNotifications),
                   SetRow(LucideIcons.moonStar, C.indigo,
-                      l?.settingsSleepHmmRowTitle ??
-                          'Experimental sleep staging (HMM)',
-                      sub: l?.settingsSleepHmmRowSub ??
-                          'Research algorithm, not a medical device. Off by '
-                              'default; applies from the next sync',
+                      rf ? 'Experimental sleep stages' : (l?.settingsSleepHmmRowTitle ??
+                          'Experimental sleep staging (HMM)'),
+                      sub: rf
+                          ? 'Research method, off by default'
+                          : (l?.settingsSleepHmmRowSub ??
+                              'Research algorithm, not a medical device. Off by '
+                                  'default; applies from the next sync'),
                       value: sleepHmm ? on : off,
                       chevron: false,
                       onTap: onToggleSleepHmm),
@@ -826,7 +928,7 @@ class MoreSettingsView extends StatelessWidget {
                     valueListenable: GlassLook.style,
                     builder: (c, style, _) => SetRow(
                         LucideIcons.layers, C.indigo, 'Style',
-                        sub: switch (style) {
+                        sub: rf ? '' : switch (style) {
                           EdgeStyle.original => 'The app as it first shipped',
                           EdgeStyle.glass => 'Frosted glass over moving colour',
                           EdgeStyle.line =>
@@ -848,15 +950,22 @@ class MoreSettingsView extends StatelessWidget {
                       },
                       onTap: onCycleClockFormat),
                   if (appIcon != null)
-                    _IconRow(chosen: appIcon!, onPick: onPickIcon),
+                    rf
+                        // One tap down: the five icons on their own screen.
+                        ? SetRow(LucideIcons.image, C.indigo, 'App icon',
+                            value: appIcon!.label,
+                            onTap: () => goto(c, _IconScreen(chosen: appIcon!, onPick: onPickIcon)))
+                        : _IconRow(chosen: appIcon!, onPick: onPickIcon),
                   // Opt-in, and it says what it does rather than what it is
                   // about — "Cycle tracking" alone leaves you guessing whether
                   // switching it off throws the entries away.
                   SetRow(LucideIcons.droplet, C.pink,
                       l?.settingsCycleTrackingRowTitle ?? 'Cycle tracking',
-                      sub: l?.settingsCycleTrackingRowSubHealth ??
-                          'Adds Cycle to Health. Off hides it and keeps '
-                              'everything already logged',
+                      sub: rf
+                          ? 'Adds Cycle to Health'
+                          : (l?.settingsCycleTrackingRowSubHealth ??
+                              'Adds Cycle to Health. Off hides it and keeps '
+                                  'everything already logged'),
                       value: cycleTracking ? on : off,
                       onTap: onToggleCycleTracking),
                 ]),
@@ -864,8 +973,10 @@ class MoreSettingsView extends StatelessWidget {
                   SetRow(LucideIcons.download, C.green,
                       l?.settingsExportBackupImportRowTitle ??
                           'Export, backup, import',
-                      sub: l?.settingsExportBackupImportRowSub ??
-                          'Spreadsheets, a full copy, and bringing history in',
+                      sub: rf
+                          ? 'Spreadsheets and a full copy'
+                          : (l?.settingsExportBackupImportRowSub ??
+                              'Spreadsheets, a full copy, and bringing history in'),
                       onTap: onData),
                   // The row P1 was missing. Everything behind it — the
                   // permission request, the retry/backoff, the four gates —
@@ -879,10 +990,12 @@ class MoreSettingsView extends StatelessWidget {
                       value: healthSync ? on : off,
                       onTap: onToggleHealthSync),
                   SetRow(LucideIcons.footprints, C.teal,
-                      l?.settingsStepsRowTitle ?? 'Steps',
-                      sub: l?.settingsStepsRowSub ??
-                          'This phone’s own step counter, for the hours the '
-                              'band doesn’t cover. Nothing leaves the device',
+                      rf ? 'Phone steps' : (l?.settingsStepsRowTitle ?? 'Steps'),
+                      sub: rf
+                          ? 'For hours the band doesn’t cover'
+                          : (l?.settingsStepsRowSub ??
+                              'This phone’s own step counter, for the hours the '
+                                  'band doesn’t cover. Nothing leaves the device'),
                       value: phoneSteps ? on : off,
                       onTap: onTogglePhoneSteps),
 
@@ -894,9 +1007,11 @@ class MoreSettingsView extends StatelessWidget {
                       LucideIcons.footprints,
                       C.teal,
                       l?.settingsStepCalibration ?? 'Step calibration',
-                      sub: l?.settingsStepCalibrationSub ??
-                          'Teaches the strap your own walking, so its step count '
-                              'fits you. Nothing leaves the device',
+                      sub: rf
+                          ? 'Corrects your band’s step count'
+                          : (l?.settingsStepCalibrationSub ??
+                              'Teaches the strap your own walking, so its step count '
+                                  'fits you. Nothing leaves the device'),
                       onTap: () => goto(c, const StepCalibrationScreen())),
                 ]),
                 settingsGroup(c, l?.settingsGroupPrivacy ?? 'Privacy', [
@@ -908,18 +1023,22 @@ class MoreSettingsView extends StatelessWidget {
                       onTap: onToggleTelemetry),
                   SetRow(LucideIcons.messageSquareWarning, C.orange,
                       l?.settingsReportIssueRowTitle ?? 'Report an issue',
-                      sub: l?.settingsReportIssueRowSub ??
-                          'Sends what you choose to the maintainers, encrypted',
+                      sub: rf
+                          ? 'You choose what to send'
+                          : (l?.settingsReportIssueRowSub ??
+                              'Sends what you choose to the maintainers, encrypted'),
                       onTap: () => goto(c, const ReportIssueScreen())),
                   // The food log's one outbound call. Named by what it sends,
                   // not by the feature it powers — a scan is the only thing
                   // that triggers it and the barcode is the whole payload.
                   SetRow(LucideIcons.scanBarcode, C.domFood,
-                      l?.settingsBarcodeLookupRowTitle ??
-                          'Look barcodes up online',
-                      sub: l?.settingsBarcodeLookupRowSub ??
-                          'Sends a scanned barcode to openfoodfacts.org. '
-                              'Nothing about you goes with it',
+                      rf ? 'Look up barcodes online' : (l?.settingsBarcodeLookupRowTitle ??
+                          'Look barcodes up online'),
+                      sub: rf
+                          ? 'Sends only the barcode'
+                          : (l?.settingsBarcodeLookupRowSub ??
+                              'Sends a scanned barcode to openfoodfacts.org. '
+                                  'Nothing about you goes with it'),
                       value: barcodeLookup ? on : off,
                       onTap: onToggleBarcodeLookup),
                   if (showHealthShare)
@@ -964,6 +1083,12 @@ class MoreSettingsView extends StatelessWidget {
                 // only while every wearable is (rule R6).
                 if (devMode) wearableSettingsGroup(c),
                 settingsGroup(c, l?.settingsGroupAbout ?? 'About', [
+                  // Line and Glass: the community asks that used to sit on
+                  // Today, here where you go looking for them.
+                  if (rf)
+                    SetRow(LucideIcons.users, C.indigo, 'Community',
+                        sub: 'Discord, and supporting the project',
+                        onTap: () => goto(c, const _CommunityScreen())),
                   if (version.isNotEmpty)
                     SetRow(LucideIcons.info, C.n500,
                         l?.settingsVersionRowTitle ?? 'Version',

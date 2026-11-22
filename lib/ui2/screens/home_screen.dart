@@ -1,4 +1,5 @@
 import '../../l10n/date_text.dart';
+import '../../coach/coach_config.dart' show CoachConfig;
 // HOME — decision-oriented. "What matters today?"
 //
 // Three rings that decide the day — what the night gave back, what the day has
@@ -67,7 +68,7 @@ import '../../state/units_controller.dart';
 import '../../theme/theme_switcher.dart' show themedRoute;
 import '../activity/day_strain.dart' show DayStrainDetail;
 import '../profile/alarm.dart'
-    show AlarmArmState, alarmArmOf, alarmDoor, alarmGlanceCard;
+    show AlarmArmState, alarmArmOf, alarmDoor, alarmGlanceCard, alarmGlanceRow, AlarmScreen;
 import '../profile/devices.dart' show RePair, formatDayTime;
 import '../profile/profile.dart';
 import '../profile/wearable_numbers.dart'
@@ -981,8 +982,19 @@ class RingTrio extends StatelessWidget {
     ];
 
     // Line: no rings. Each score is a track with stops, like a stretch of
-    // metro line, and the card keeps every tap the rings had.
+    // metro line, and the card keeps every tap the rings had. Sleep leads
+    // (it is what the morning asks first) and carries its own "short of
+    // need" line, so the same fact is not said again in a panel under it.
     if (P.of(c).metro) {
+      final order = [HomeRingKind.sleep, HomeRingKind.recovery, HomeRingKind.strain];
+      final lineRings = [for (final k in order) rings.firstWhere((r) => r.kind == k)];
+      final lineRows = <Widget>[
+        if (d.sleepProvisional) rows.first,
+        for (final k in pressingRings(d))
+          if (k != HomeRingKind.sleep) _HomeWhyPanel(kind: k, data: d, onTap: _open(k)),
+        if (recoveryUpdatedLine(d.readinessUpdate, l) case final note?)
+          _HomeUpdateNote(line: note, onTap: _open(HomeRingKind.recovery)),
+      ];
       return Surface(
         elevation: 2,
         pad: const EdgeInsets.symmetric(horizontal: S.x4, vertical: S.x2),
@@ -992,9 +1004,19 @@ class RingTrio extends StatelessWidget {
             header!,
             const SizedBox(height: S.x1),
           ],
-          for (final (i, r) in rings.indexed)
-            _LineScore(r, first: i == 0 && header == null, onTap: _open(r.kind)),
-          ...slot,
+          for (final (i, r) in lineRings.indexed)
+            _LineScore(r,
+                first: i == 0 && header == null,
+                note: r.kind == HomeRingKind.sleep ? lineSleepNote(d) : null,
+                figureText: r.kind == HomeRingKind.sleep && r.measured &&
+                        d.sleepMin.value != null
+                    ? '${lineHm(d.sleepMin.value!)}${d.sleepNeedMin.value == null ? '' : ' of ${lineHm(d.sleepNeedMin.value!).replaceAll(' 00', '')}'}'
+                    : null,
+                onTap: _open(r.kind)),
+          for (final (i, row) in lineRows.take(2).indexed) ...[
+            SizedBox(height: i == 0 ? S.x3 : S.x2),
+            row,
+          ],
           const SizedBox(height: S.x2),
         ]),
       );
@@ -1039,16 +1061,58 @@ class RingTrio extends StatelessWidget {
 /// them. Learning is a row of stops (one per night or day the baseline
 /// needs, the banked ones filled); a measured score fills the track to its
 /// value and ends in a stop.
+/// "6 h 42" / "42 min": Line's hours-and-minutes, set like a timetable.
+String lineHm(num min) {
+  final m = min.round();
+  if (m < 60) return '$m min';
+  return '${m ~/ 60} h ${(m % 60).toString().padLeft(2, '0')}';
+}
+
+/// Line's sleep line: how far short of the need the night fell, or null when
+/// it met it (the track already shows that).
+String? lineSleepNote(HomeData d) {
+  final s = d.sleepMin.value, n = d.sleepNeedMin.value;
+  if (s == null || n == null || n <= 0 || s >= n) return null;
+  return '${lineHm(n - s)} short of your need.';
+}
+
+/// What a learning score says under its track: the plain fact of when the
+/// first real number arrives, from the same counts the stops are drawn from.
+String? _lineLearningNote(_RingState r) {
+  final have = r.have, need = r.need;
+  if (!r.calibrating || have == null || need == null) return null;
+  final left = need - have;
+  return switch (r.kind) {
+    HomeRingKind.recovery => 'Learning your normal. Scored from night ${need + 1}.',
+    HomeRingKind.strain => left <= 1
+        ? 'Learning your normal. Scored after 1 more day.'
+        : 'Learning your normal. Scored after $left more days.',
+    HomeRingKind.sleep => null,
+  };
+}
+
 class _LineScore extends StatelessWidget {
   final _RingState r;
   final bool first;
   final VoidCallback? onTap;
-  const _LineScore(this.r, {this.first = false, this.onTap});
+  final String? note;
+
+  /// The figure as Line sets it ("6 h 42 of 8 h"), when it differs from the
+  /// ring's own wording.
+  final String? figureText;
+  const _LineScore(this.r, {this.first = false, this.onTap, this.note, this.figureText});
 
   @override
   Widget build(BuildContext c) {
     final p = P.of(c);
-    final col = r.calibrating ? p.on(r.color) : r.arc(p);
+    // Strain runs on the red line in Line; violet is not part of the style.
+    final base = r.kind == HomeRingKind.strain ? LineTok.red : r.color;
+    final col = r.calibrating ? p.on(base) : (r.kind == HomeRingKind.strain ? p.on(LineTok.red) : r.arc(p));
+    final figure = figureText ?? (r.calibrating && r.sub.isNotEmpty ? r.sub : r.value);
+    // "2 of 14 nights": the count large, the rest as its unit.
+    final split = RegExp(r'^(.+?) (of .+)$').firstMatch(figure);
+    final big = bigText(c);
+    final caption = note ?? _lineLearningNote(r) ?? (r.calibrating ? r.value : r.sub);
     return Pressable(
       onTap: onTap,
       semanticLabel: '${r.label}, ${r.value}${r.sub.isEmpty ? '' : ', ${r.sub}'}',
@@ -1058,17 +1122,29 @@ class _LineScore extends StatelessWidget {
             ? null
             : BoxDecoration(border: Border(top: BorderSide(color: p.line))),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(crossAxisAlignment: CrossAxisAlignment.baseline,
+          Flex(
+              direction: big ? Axis.vertical : Axis.horizontal,
+              crossAxisAlignment: big ? CrossAxisAlignment.start : CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic, children: [
             Text(r.label,
                 style: F.body.copyWith(color: p.ink, fontWeight: FontWeight.w600)),
-            const Spacer(),
+            if (!big) const Spacer(),
             // A reading is a figure. While learning, the count of nights is
             // the figure and "learning" moves under the track.
-            Text(r.calibrating && r.sub.isNotEmpty ? r.sub : r.value,
-                style: r.measured || (r.calibrating && r.sub.isNotEmpty)
-                    ? F.n24.copyWith(color: r.provisional ? p.ink3 : p.ink)
-                    : F.body.copyWith(color: p.ink2)),
+            if (r.measured || (r.calibrating && r.sub.isNotEmpty))
+              Text.rich(TextSpan(children: [
+                TextSpan(
+                    text: split?.group(1) ?? figure,
+                    style: F.n24.copyWith(color: r.provisional ? p.ink3 : p.ink)),
+                if (split != null)
+                  TextSpan(text: ' ${split.group(2)}', style: F.cap.copyWith(color: p.ink3)),
+              ]))
+            else
+              Text(figure, style: F.body.copyWith(color: p.ink2)),
+            if (!big && onTap != null) ...[
+              const SizedBox(width: S.x1),
+              Icon(LucideIcons.chevronRight, size: 16, color: p.ink3),
+            ],
           ]),
           const SizedBox(height: S.x2),
           SizedBox(
@@ -1086,10 +1162,9 @@ class _LineScore extends StatelessWidget {
               ),
             ),
           ),
-          if ((r.calibrating ? r.value : r.sub).isNotEmpty) ...[
+          if (caption.isNotEmpty) ...[
             const SizedBox(height: S.x1),
-            Text(r.calibrating ? r.value : r.sub,
-                style: F.cap.copyWith(color: p.ink3)),
+            Text(caption, style: F.cap.copyWith(color: p.ink3)),
           ],
         ]),
       ),
@@ -1112,16 +1187,23 @@ class _HomeWhyPanel extends StatelessWidget {
       HomeRingKind.sleep => l?.homeWhySleepTitle ?? 'Sleep is short of need',
       HomeRingKind.strain => l?.homeWhyStrainTitle ?? 'Strain is above target',
     };
-    final body = switch (kind) {
+    var body = switch (kind) {
       HomeRingKind.recovery => _recoveryWhy(data, l),
       HomeRingKind.sleep => _sleepWhy(data, l),
       HomeRingKind.strain => _strainWhy(data, l),
     };
+    var heading = title;
+    // Glass says the shortfall in the title, and the night in plain words.
+    final sMin = data.sleepMin.value, nMin = data.sleepNeedMin.value;
+    if (kind == HomeRingKind.sleep && P.of(c).glass && sMin != null && nMin != null && nMin > sMin) {
+      heading = 'Sleep is ${lineHm(nMin - sMin)} short';
+      body = '${lineHm(sMin)} asleep of your ${lineHm(nMin).replaceAll(' 00', '')} need';
+    }
     // One tappable node (Pressable merges the texts): the title names the
     // ring, the body gives the reason, each announced once.
     return _HomeWhyRow(
         id: kind.name,
-        title: title,
+        title: heading,
         body: body,
         color: state.color,
         icon: state.icon,
@@ -2735,7 +2817,7 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
                   ]),
             ),
             const SizedBox(width: S.x3),
-            const ProfileAvatar(accent: C.domHome),
+            const HeaderActions(topic: GuideTopic.today, accent: C.domHome),
           ]),
         )
       else
@@ -2776,7 +2858,7 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
           const SizedBox(width: S.x3),
           // The coach moved to its own chip under the plan, and Profile is the
           // same avatar every tab carries.
-          const ProfileAvatar(accent: C.domHome),
+          const HeaderActions(topic: GuideTopic.today, accent: C.domHome),
         ]),
       ),
 
@@ -2842,7 +2924,7 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
         if (RingTrio.has(d) && p.metro)
           Padding(
             padding: const EdgeInsets.fromLTRB(S.x1, S.x2, S.x1, S.x3),
-            child: Text('Your scores',
+            child: Text('Last night and today',
                 style: F.t2.copyWith(
                     color: p.ink,
                     fontFamily: LineTok.display,
@@ -2912,8 +2994,13 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
           }),
 
         const SizedBox(height: S.x3),
+        // Glass: the day's prayers under the rings, the way Line has them on
+        // its metro line. Fajr matters more than any score.
+        if (p.glass && isToday) ..._glassPrayer(c),
         const DetectedActivitiesCard(),
-        const CommunityNudge(),
+        // Line and Glass keep Today for today: the community asks live in
+        // Settings > About > Community.
+        if (!(p.metro || p.glass)) const CommunityNudge(),
 
         // ── the rollup was withheld, not absent ──
         if (stale != null) ...[const SizedBox(height: S.x3), stale],
@@ -2935,7 +3022,7 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
         // ── today's plan: only what the app can actually stand behind ──
         // Skipped on a past day — "3,000 steps left" or "aim for 11.4
         // strain" about a day already over is an instruction, not a fact.
-        if (isToday)
+        if (isToday && !(p.metro || p.glass))
           Section(l?.homeTodaysPlan ?? "Today's plan", _plan(c, p, d)),
 
         // ── the way into the whole day ──
@@ -2945,11 +3032,24 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
         // shape and makes no observation — it names a place and goes there.
         // Home decides; the day view is where you go to look, and until this
         // row existed the only ways in were two screens deep.
+        if (p.metro || p.glass)
+          // Line and Glass: every door off Today in one list, one row shape.
+          Section('More for today', RowGroup([
+            if (isToday) _briefingRow(c, d),
+            ListRow(
+                icon: LucideIcons.chartGantt,
+                title: l?.homeBreakdownTitle ?? 'Breakdown of your day',
+                sub: l?.homeBreakdownSubtitle ?? 'Hour by hour',
+                onTap: () => go(c, DayTimelineScreen(day: _day))),
+            if (isToday) coachRow(c),
+          ]))
+        else ...[
         const SizedBox(height: S.x5),
         detailLinkRow(c, LucideIcons.chartGantt,
             l?.homeBreakdownTitle ?? 'Breakdown of your day',
             l?.homeBreakdownSubtitle ?? 'Hour by hour',
             () => go(c, DayTimelineScreen(day: _day))),
+        ],
       ],
 
       // ── the next alarm: a door, same as the one above ──
@@ -2961,9 +3061,9 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
           alarmDoor(c, a.$1, a.$2),
         ],
       // The coach, set up or not, on every ordinary or bare today.
-      if (isToday) ...[
+      if (isToday && !((p.metro || p.glass) && !bare)) ...[
         const SizedBox(height: S.x4),
-        coachChip(c),
+        if (p.metro || p.glass) RowGroup([coachRow(c)]) else coachChip(c),
       ],
       // The Today guide starts on the strain ring, which a bare past day does not draw.
       if (isToday) const HelpEntry(topic: GuideTopic.today),
@@ -3052,6 +3152,8 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
   }
 
   Widget _glance(BuildContext c, HomeData d, {required bool isToday}) {
+    final p0 = P.of(c);
+    if (p0.metro || p0.glass) return _glanceList(c, d, isToday: isToday);
     final l = AppLocalizations.of(c);
     final cards = <Widget>[];
     final absent = <StatusCard>[];
@@ -3239,6 +3341,103 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
   }
 
 
+  /// Line and Glass: the day's figures as one list. What "Today's plan" said
+  /// lives in the rows it was about (steps left on Steps; the strain target
+  /// gets its own row); tonight's sleep need is on the Sleep tab. Glass shows
+  /// the alarm in its prayer card, Line here.
+  Widget _glanceList(BuildContext c, HomeData d, {required bool isToday}) {
+    final l = AppLocalizations.of(c);
+    final p = P.of(c);
+    Widget detail(String key) =>
+        isToday || _day == null ? MetricDetail(key) : metricDayScreen(key, _day!);
+    final rows = <Widget>[];
+    final absent = <StatusCard>[];
+    if (d.rhr.isEmpty) {
+      final s = StatusCard.forMetric(l?.homeNoRestingHr ?? 'No resting heart rate', d.rhr,
+          why: d.sleepMin.isEmpty
+              ? (l?.homeNoRestingHrWhy ??
+                  'Resting heart rate is read from sleep, and no sleep was recorded.')
+              : '');
+      if (s != null) absent.add(s);
+    } else {
+      rows.add(ListRow(
+          icon: LucideIcons.heart,
+          title: 'Resting heart rate',
+          sub: 'Overnight',
+          value: '${d.rhr.value!.round()}',
+          unit: 'bpm',
+          onTap: () => go(c, detail('resting_hr'))));
+    }
+    final steps = d.steps.value;
+    final left = steps == null || d.stepGoal <= 0 ? null : (d.stepGoal - steps).round();
+    rows.add(ListRow(
+        icon: LucideIcons.footprints,
+        title: l?.homeSteps ?? 'Steps',
+        sub: steps == null
+            ? 'Not recorded'
+            : [
+                if (left != null)
+                  left > 0
+                      ? '${thousands(left)} to your goal of ${thousands(d.stepGoal)}'
+                      : 'Goal of ${thousands(d.stepGoal)} met',
+                ?stepSensorLabel(d.steps, l),
+              ].join(', '),
+        value: steps == null ? (l?.homeStepsNone ?? 'None') : thousands(steps),
+        onTap: () => go(c, detail('steps'))));
+    if (d.calories.isEmpty) {
+      final s = StatusCard.forMetric(l?.homeNoEnergyEstimate ?? 'No energy estimate', d.calories);
+      if (s != null) absent.add(s);
+    } else {
+      rows.add(ListRow(
+          icon: LucideIcons.flame,
+          title: l?.homeActiveEnergy ?? 'Active energy',
+          sub: d.caloriesTotal.value == null
+              ? (l?.homeCaloriesEstimated ?? 'Estimated')
+              : '${thousands(d.caloriesTotal.value)} kcal in total',
+          value: thousands(d.calories.value),
+          unit: 'kcal',
+          onTap: () => go(c, detail('calories'))));
+    }
+    final target = d.strainTarget;
+    if (isToday && target != null && target['value'] is num) {
+      final aim = target['value'] as num;
+      final met = (d.strain.value ?? -1) >= aim;
+      rows.add(ListRow(
+          icon: LucideIcons.zap,
+          title: met ? 'Strain target met' : 'Strain target',
+          sub: [
+            'Aim for ${_fixed1OrEmpty(target['low'])} to ${_fixed1OrEmpty(target['high'])}',
+            if (target['estimated'] == true) 'estimated',
+          ].join(', '),
+          value: displayFixed(aim, 1),
+          onTap: () => go(c, DayStrainDetail(day: isToday ? null : _day))));
+    }
+    if (isToday && p.metro) {
+      if (alarmArmOfContext(c) case final (DateTime?, AlarmArmState) a) {
+        rows.add(alarmGlanceRow(c, a.$1, a.$2));
+      }
+    }
+    return Column(children: [
+      RowGroup(rows),
+      if (absent.isNotEmpty) ...[
+        const SizedBox(height: S.x3),
+        if (absent.length == 1)
+          absent.single
+        else
+          StatusCard(
+            isToday
+                ? (l?.homeSomeDataMissingTitle ?? 'Some of today\'s data is missing')
+                : (l?.homeSomeDayDataMissingTitle ?? 'Some of this day\'s data is missing'),
+            [
+              for (final s in absent)
+                [s.what, s.why, s.fix].where((t) => t.isNotEmpty).join('. '),
+            ].join('\n'),
+            icon: LucideIcons.circleDashed,
+          ),
+      ],
+    ]);
+  }
+
   Widget _plan(BuildContext c, P p, HomeData d) {
     final l = AppLocalizations.of(c);
     final rows = <Widget>[];
@@ -3349,6 +3548,108 @@ class _HomeScreenState extends State<HomeScreen> with RevisionReload {
       BriefingStore.read(period, day: d.dayId),
       BriefingStore.read(BriefingPeriod.morning, day: d.dayId),
     );
+  }
+
+  /// [_briefingDoor] as a list row (Line and Glass): same words, same tap.
+  Widget _briefingRow(BuildContext c, HomeData d) {
+    final l = AppLocalizations.of(c);
+    final cached = _resolveBriefingNow(d).briefing;
+    return ListRow(
+      icon: LucideIcons.sparkles,
+      title: l?.homeBriefingTitle ?? 'Briefing',
+      sub: cached?.oneLiner == 'Nothing stood out tonight.'
+          ? uiText(c, cached!.oneLiner)
+          : cached?.oneLiner ?? 'Write today\'s summary',
+      onTap: () async {
+        final screen = AiBriefingScreen(period: _resolveBriefingNow(d).period);
+        await Navigator.of(c).push(
+            themedRoute<void>((_) => screen, name: screen.runtimeType.toString()));
+        if (mounted) reload();
+      },
+    );
+  }
+
+  /// Glass's prayer card: the next prayer, the day's five as dots (done,
+  /// next, later) and the Fajr alarm. Cached prayer times only, like Line.
+  List<Widget> _glassPrayer(BuildContext c) {
+    final app = c.watch<AppState>();
+    final p = P.of(c);
+    final now = widget.now ?? debugHomeWallClock();
+    DateTime onToday(DateTime t) =>
+        DateTime(now.year, now.month, now.day, t.hour, t.minute);
+    final fajr = app.fajrPrayerNext;
+    final stops = <MetroStop>[
+      if (fajr != null) MetroStop('Fajr', onToday(fajr)),
+      for (final e in app.prayerTimesToday.entries)
+        MetroStop(e.key.api, onToday(e.value)),
+    ]..sort((a, b) => a.at.compareTo(b.at));
+    if (stops.isEmpty) return const [];
+    MetroStop? next;
+    for (final s in stops) {
+      if (s.at.isAfter(now)) {
+        next = s;
+        break;
+      }
+    }
+    next ??= fajr == null ? null : MetroStop('Fajr', fajr);
+    final gold = p.on(C.prayer);
+    String inFor(DateTime t) {
+      final m = t.difference(now).inMinutes.clamp(0, 24 * 60);
+      return m >= 60 ? 'in ${m ~/ 60} h ${m % 60} min' : 'in $m min';
+    }
+    final dots = Padding(
+      padding: const EdgeInsets.fromLTRB(S.x4, 0, S.x4, S.x3),
+      child: Row(children: [
+        for (final s in stops)
+          Expanded(
+            child: Builder(builder: (c) {
+              final done = !s.at.isAfter(now);
+              final isNext = next != null && s.at == next.at && s.name == next.name;
+              return Column(children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: done ? gold : null,
+                    border: Border.all(color: done || isNext ? gold : p.ink3, width: 2),
+                    boxShadow: isNext ? [BoxShadow(color: gold.withValues(alpha: .3), spreadRadius: 3)] : null,
+                  ),
+                ),
+                const SizedBox(height: S.x1),
+                Text(s.name,
+                    style: F.over.copyWith(
+                        color: isNext ? gold : p.ink, fontWeight: FontWeight.w600)),
+                clockText(formatClockOf(s.at),
+                    F.over.copyWith(color: isNext ? gold : p.ink3),
+                    F.over.copyWith(color: isNext ? gold : p.ink3)),
+              ]);
+            }),
+          ),
+      ]),
+    );
+    return [
+      Semantics(
+        container: true,
+        label: next == null
+            ? null
+            : 'Next prayer ${next.name} at ${formatClockOf(next.at)}, ${inFor(next.at)}',
+        child: RowGroup([
+          if (next != null)
+            ListRow(
+              icon: LucideIcons.sun,
+              iconColor: C.prayer,
+              title: '${next.name} at ${formatClockOf(next.at)}',
+              sub: 'Next prayer, ${inFor(next.at)}',
+              onTap: () => go(c, const AlarmScreen()),
+            ),
+          ExcludeSemantics(child: dots),
+          if (alarmArmOfContext(c) case final (DateTime?, AlarmArmState) a)
+            alarmGlanceRow(c, a.$1, a.$2, title: 'Fajr alarm'),
+        ]),
+      ),
+      const SizedBox(height: S.x3),
+    ];
   }
 
   Widget _briefingDoor(BuildContext c, HomeData d) {
@@ -3466,6 +3767,27 @@ Widget firstWeekCard(BuildContext c,
 /// The coach's one door on Today. It used to be an icon that appeared only
 /// once a model was configured, so a new user never learned there was a
 /// coach. Not set up, the chip says what it is for and opens the setup.
+bool _coachLocal(BuildContext c) {
+  try {
+    return c.watch<CoachConfig>().isLocalEndpoint;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// [coachChip] as a list row (Line and Glass).
+Widget coachRow(BuildContext c) {
+  final l = AppLocalizations.of(c);
+  final ready = coachReady(c);
+  return ListRow(
+    icon: LucideIcons.messageSquare,
+    title: ready ? (l?.homeAskCoach ?? 'Ask the coach') : (l?.homeCoachSetUpChip ?? 'Set up the coach'),
+    // Only said when it is true: a cloud model does send your question out.
+    sub: _coachLocal(c) ? 'On this iPhone, nothing leaves it' : null,
+    onTap: () => go(c, ready ? const CoachScreen() : const CoachSetup()),
+  );
+}
+
 Widget coachChip(BuildContext c) {
   final p = P.of(c);
   final l = AppLocalizations.of(c);

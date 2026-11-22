@@ -22,7 +22,6 @@ import '../../l10n/app_localizations.dart';
 import '../../models/metric.dart';
 import '../../models/payloads.dart' show todayHeadlineOf;
 import '../../state/app_state.dart';
-import '../profile/profile.dart' show ProfileAvatar;
 import '../profile/wearable_numbers.dart'
     show WearableCells, kHealthWearableRows;
 import '../ui2.dart';
@@ -669,7 +668,7 @@ class _HealthScreenState extends State<HealthScreen> with RevisionReload {
     final l = AppLocalizations.of(c);
     return ListView(padding: pad, children: [
       ScreenTitle(l?.healthTitle ?? 'Health',
-          trailing: const ProfileAvatar(accent: C.domHealth)),
+          trailing: const HeaderActions(topic: GuideTopic.health, accent: C.domHealth)),
       SubTabs(_tabsOf(l), _tab, _select, color: C.blue),
       const SizedBox(height: S.x5),
       if (_loading && _d == null)
@@ -695,6 +694,11 @@ class _HealthScreenState extends State<HealthScreen> with RevisionReload {
     final l = AppLocalizations.of(c);
     final rows = <Widget>[];
     final gaps = <Widget>[];
+    // Line and Glass: plain list rows (no sparkline), and what has not
+    // arrived yet in one "Still learning" card instead of a card each.
+    final rf = p.metro || p.glass;
+    final listRows = <Widget>[];
+    final learning = <StatusCard>[];
 
     // ALL FIVE ROWS ARE READ FROM THE NIGHT, so all five take the same
     // measured gap. `overnight: false` is for a row that is not — a hole at
@@ -716,9 +720,19 @@ class _HealthScreenState extends State<HealthScreen> with RevisionReload {
                 'No ${name.toLowerCase()}',
             m,
             why: whyAbsent ?? '', gap: overnight ? d.nightGap : null);
-        if (s != null) gaps.add(s);
+        if (s != null) {
+          gaps.add(s);
+          learning.add(s);
+        }
         return;
       }
+      listRows.add(ListRow(
+          icon: icon,
+          title: name == (l?.healthRowRespRate ?? 'Respiratory rate') ? 'Breathing rate' : name,
+          sub: sub,
+          value: value,
+          unit: unit == '/100' || unit == 'br/min' ? null : unit,
+          onTap: () => go(c, MetricDetail(metricKey))));
       rows.add(MetricRow(icon, col, name, value,
           sub: sub,
           unit: unit,
@@ -758,7 +772,7 @@ class _HealthScreenState extends State<HealthScreen> with RevisionReload {
 
     final hrvMetric = d.hrv;
     row(hrvMetric, LucideIcons.activity, C.green, l?.healthRowHrv ?? 'HRV',
-        ofNight(l?.healthSubRmssdAsleep ?? 'HRV, asleep'),
+        ofNight(rf ? 'Asleep' : (l?.healthSubRmssdAsleep ?? 'HRV, asleep')),
         hrvMetric.value == null ? '' : '${hrvMetric.value!.round()}', 'ms',
         d.spark('hrv', 24), 'hrv',
         rising: Rising.good,
@@ -801,7 +815,7 @@ class _HealthScreenState extends State<HealthScreen> with RevisionReload {
         ofNight((stressBlock is Map && stressBlock['level'] is String
                 ? stressLevelLabel(l, stressBlock['level'] as String)
                 : null) ??
-            (l?.healthRowStress ?? 'Stress')),
+            (rf ? 'Out of 100' : (l?.healthRowStress ?? 'Stress'))),
         stressScore == null ? '' : '${stressScore.round()}',
         // 0–100, and the scale has to be on the row. Wellness has always shown
         // it for the same number.
@@ -818,7 +832,7 @@ class _HealthScreenState extends State<HealthScreen> with RevisionReload {
 
     final respMetric = d.resp;
     row(respMetric, LucideIcons.wind, C.teal, l?.healthRowRespRate ?? 'Respiratory rate',
-        ofNight(l?.healthSubAsleep ?? 'Asleep'),
+        ofNight(rf ? 'Per minute, asleep' : (l?.healthSubAsleep ?? 'Asleep')),
         respMetric.value == null ? '' : respMetric.value!.toStringAsFixed(1),
         'br/min',
         d.spark('resp_rate', 24), 'resp_rate',
@@ -908,6 +922,15 @@ class _HealthScreenState extends State<HealthScreen> with RevisionReload {
             style: F.cap.copyWith(color: p.ink3)),
         const SizedBox(height: S.x2),
       ],
+      if (rf) ...[
+        if (listRows.isNotEmpty) Section('Last night', RowGroup(listRows)),
+        if (learning.isNotEmpty)
+          Section('Still learning', RowGroup([
+            for (final g in learning)
+              ListRow(title: g.what.replaceFirst(RegExp(r'^No '), '').let((t) => t[0].toUpperCase() + t.substring(1)),
+                  sub: [g.why, g.fix].where((t) => t.isNotEmpty).join(' ')),
+          ])),
+      ] else ...[
       if (rows.isNotEmpty)
         Surface(
           pad: const EdgeInsets.symmetric(horizontal: S.x4),
@@ -919,6 +942,7 @@ class _HealthScreenState extends State<HealthScreen> with RevisionReload {
           ]),
         ),
       for (final g in gaps) ...[const SizedBox(height: S.x3), g],
+      ],
       // The active wearable's heart rows, each with its class, source line
       // and reason. Nothing on a WHOOP-only install, nor when handed data.
       if (widget.data == null) const WearableCells(kHealthWearableRows),
@@ -956,6 +980,27 @@ class _HealthScreenState extends State<HealthScreen> with RevisionReload {
       // ONE door now, not one per tab: in the contributed data breathing,
       // medication and cycle were each used by a handful of people, so they
       // share a row and the screen behind it keeps its own tabs.
+      if (rf)
+        // One "More" list: the Mind door, and shortcuts to Healthspan and the
+        // doctor's report (both still on Vitals too).
+        Section('More', RowGroup([
+          ListRow(
+              icon: LucideIcons.wind,
+              title: l?.healthWellbeingTitle ?? 'Mind, habits and medication',
+              sub: 'Breathing, mood and the journal',
+              onTap: () => go(c, const WellnessScreen(initialTab: 0))),
+          ListRow(
+              icon: LucideIcons.hourglass,
+              title: 'Healthspan',
+              sub: 'An estimated age from six habits',
+              onTap: () => go(c, const HealthspanScreen())),
+          ListRow(
+              icon: LucideIcons.fileText,
+              title: 'Report for your doctor',
+              sub: 'A PDF of your numbers to share',
+              onTap: () => showDoctorReportSheet(c)),
+        ]))
+      else
       Section(
         l?.healthWellbeingTitle ?? 'Mind, habits and medication',
         detailLinkRow(
@@ -1949,4 +1994,9 @@ bool _cycleTrackingOn(BuildContext c) {
   } on ProviderNotFoundException {
     return false;
   }
+}
+
+
+extension _Let<T> on T {
+  U let<U>(U Function(T) f) => f(this);
 }

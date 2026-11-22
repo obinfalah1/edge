@@ -38,6 +38,15 @@ import 'skeleton/guide_plot.dart' show GuideDecoration;
 /// them fail AA on white. Run them through [P.on] (accent as text) or
 /// [P.fill] (accent as a filled surface under [P.inkOnFill]) first.
 class C {
+  /// Prayer gold for Glass (Line uses [LineTok.lapis]).
+  static const prayer = Color(0xFFF5C451);
+
+  /// Ink on the bright accent fill in the dark styles.
+  static const onAccent = Color(0xFF05140E);
+
+  /// Recovery green as signage ink on the dark sign panel.
+  static const signGreen = Color(0xFF2BC48A);
+
   // primary
   static const green = Color(0xFF34C759);
   static const greenD = Color(0xFF248A3D);

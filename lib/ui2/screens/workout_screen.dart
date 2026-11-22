@@ -43,8 +43,9 @@ import '../activity/setup.dart';
 import '../activity/summary.dart';
 import 'slot_scrub.dart';
 import '../charts.dart';
-import '../profile/profile.dart' show ProfileAvatar, openProfile;
+import '../profile/profile.dart' show openProfile;
 import '../grammar.dart';
+import '../rows.dart';
 import '../guides/help_entry.dart';
 import '../revision.dart';
 import '../theme.dart';
@@ -144,7 +145,13 @@ class _WorkoutScreenState extends State<WorkoutScreen> with RevisionReload {
           children: [
             for (final w in <Widget>[
               ScreenTitle(loc?.tabActivity ?? 'Activity',
-                  trailing: const ProfileAvatar(accent: C.domMove)),
+                  trailing: const HeaderActions(topic: GuideTopic.activity, accent: C.domMove)),
+              if (P.of(c).metro || P.of(c).glass)
+                Padding(
+                  padding: const EdgeInsets.only(left: S.x1, bottom: S.x3),
+                  child: Text('Strain builds through the day, 0 to 21',
+                      style: F.cap.copyWith(color: P.of(c).ink3)),
+                ),
               SubTabs(_tabs(loc), tab, (i) => setState(() => tab = i),
                   color: C.domMove),
               const SizedBox(height: S.x5),
@@ -243,10 +250,236 @@ class _WorkoutScreenState extends State<WorkoutScreen> with RevisionReload {
   ActivityHost _host(_WorkoutData d) =>
       activityHost(context.read<AppState>(), history: d.setHistory);
 
+  /// Line's week as a timetable: every day from Monday to today, what you did
+  /// that day (or rest) and its strain on a short red line.
+  Widget _lineWeekRows(BuildContext c, P p, List<_PastWorkout> week, int today) {
+    const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final rows = <Widget>[];
+    for (var i = 0; i <= today; i++) {
+      final ws = [for (final w in week) if (w.start.weekday - 1 == i) w];
+      final strain = ws.fold<double?>(null, (a, w) => w.strain == null ? a : (a ?? 0) + w.strain!);
+      final text = ws.isEmpty
+          ? (i == today ? 'So far' : 'Rest')
+          : ws.map((w) => '${w.activity.name}, ${w.duration.inMinutes} min').join('; ');
+      rows.add(Pressable(
+        onTap: ws.isEmpty ? null : () => setState(() => tab = 2),
+        semanticLabel: '${i == today ? 'Today' : names[i]}, $text'
+            '${strain == null ? '' : ', strain ${displayFixed(strain, 1)}'}',
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 48),
+          padding: const EdgeInsets.symmetric(horizontal: S.x4, vertical: S.x2),
+          child: Row(children: [
+            SizedBox(
+              width: 56,
+              child: Text(i == today ? 'Today' : names[i],
+                  style: F.body.copyWith(
+                      color: p.ink, fontWeight: i == today ? FontWeight.w600 : FontWeight.w400)),
+            ),
+            Expanded(child: Text(text, style: F.cap.copyWith(color: p.ink3))),
+            if (strain != null) ...[
+              SizedBox(
+                width: 64,
+                height: 14,
+                child: CustomPaint(
+                    painter: LineTrack(
+                        fill: strain / 21,
+                        color: p.on(LineTok.red),
+                        track: p.track,
+                        knock: p.card)),
+              ),
+              SizedBox(
+                width: 44,
+                child: Text(displayFixed(strain, 1),
+                    textAlign: TextAlign.right, style: F.n17.copyWith(color: p.ink)),
+              ),
+            ],
+          ]),
+        ),
+      ));
+    }
+    return RowGroup(rows);
+  }
+
+  // ─────────────── FOR YOU (Line and Glass) ───────────────
+  //
+  // Where today's strain stands, then the one action (start) and its partner
+  // (log a past one) in the thumb zone, the three quick starts as chips, and
+  // the week as what you did rather than that you did something.
+  List<Widget> _forYouRefined(BuildContext c, P p, _WorkoutData d) {
+    final loc = AppLocalizations.of(c);
+    final strainColor = p.metro ? p.on(LineTok.red) : p.on(C.purple);
+    final m = d.strainToday;
+    final need = RegExp(r'have=(\d+),need=(\d+)').firstMatch(m.note ?? '');
+    final Widget strain;
+    if (m.value != null) {
+      strain = TrackRow(
+          title: 'Strain so far',
+          value: displayFixed(m.value!, 1),
+          unit: 'of 21',
+          fill: m.value! / 21,
+          color: strainColor,
+          note: 'Strain builds through the day.',
+          onTap: () => _push(c, const DayStrainDetail()));
+    } else if (need != null) {
+      final have = int.parse(need.group(1)!), of = int.parse(need.group(2)!);
+      final left = of - have;
+      strain = TrackRow(
+          title: 'Strain so far',
+          value: '$have',
+          unit: 'of $of days',
+          fill: of == 0 ? 0 : have / of,
+          stops: of,
+          color: strainColor,
+          note: 'Learning your normal. Strain is scored after $left more '
+              '${left == 1 ? 'day' : 'days'} of wear.',
+          onTap: () => _push(c, const DayStrainDetail()));
+    } else {
+      strain = TrackRow(
+          title: 'Strain so far',
+          value: 'None yet',
+          fill: 0,
+          color: strainColor,
+          note: 'Strain builds as you move through the day.',
+          onTap: () => _push(c, const DayStrainDetail()));
+    }
+    // This week's sessions, newest first, Monday-based like the dots.
+    final now = DateTime.now();
+    final monday = DateTime(now.year, now.month, now.day - (now.weekday - 1));
+    final week = [for (final w in d.workouts) if (!w.start.isBefore(monday)) w]
+      ..sort((a, b) => b.start.compareTo(a.start));
+    const names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    String dayName(DateTime t) =>
+        calendarDaysBetween(t, now) == 0 ? 'Today' : names[t.weekday - 1];
+    final sessionRows = [
+      for (final w in week.take(5))
+        ListRow(
+          icon: w.activity.icon,
+          title: dayName(w.start),
+          sub: '${w.activity.name}, ${w.duration.inMinutes} min',
+          value: w.strain == null ? null : displayFixed(w.strain!, 1),
+          onTap: () => setState(() => tab = 2),
+        ),
+    ];
+    final letters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    final today = now.weekday - 1;
+    final dots = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: S.x3, vertical: S.x3),
+      child: Row(children: [
+        for (var i = 0; i < 7; i++)
+          Expanded(
+            child: Column(children: [
+              Text(letters[i], style: F.over.copyWith(color: p.ink3)),
+              const SizedBox(height: S.x1),
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: d.weekDays.contains(i)
+                      ? (p.metro ? p.on(LineTok.green) : (p.dark ? p.tint : p.fill(p.tint)))
+                      : p.card2,
+                  border: i == today && !d.weekDays.contains(i)
+                      ? Border.all(color: p.metro ? LineTok.lapis : p.on(p.tint), width: 2)
+                      : null,
+                ),
+                child: d.weekDays.contains(i)
+                    ? Icon(LucideIcons.check, size: 15,
+                        color: p.metro || p.dark ? C.onAccent : p.inkOnFill)
+                    : null,
+              ),
+            ]),
+          ),
+      ]),
+    );
+    return [
+      Surface(pad: EdgeInsets.zero, child: strain),
+      const SizedBox(height: S.x3),
+      Row(children: [
+        Expanded(
+            flex: 6,
+            child: PrimaryButton('Start a workout',
+                icon: LucideIcons.plus, onTap: () => _openPicker(c, d))),
+        const SizedBox(width: S.x3),
+        Expanded(
+            flex: 5,
+            child: SecondaryButton('Log a workout', onTap: () => _push(c, const LogWorkout()))),
+      ]),
+      Section(
+        'Start again',
+        Wrap(spacing: S.x2, runSpacing: S.x2, children: [
+          for (final a in quickStart.take(3))
+            Pressable(
+              semanticLabel: 'Start ${a.name}',
+              onTap: () {
+                tapHaptic();
+                Navigator.of(c).push(MaterialPageRoute(
+                    builder: (_) => ActivitySetup(a, weightKg: d.weightKg, host: _host(d))));
+              },
+              child: Container(
+                constraints: const BoxConstraints(minHeight: 40),
+                padding: const EdgeInsets.symmetric(horizontal: S.x3, vertical: S.x2),
+                decoration: BoxDecoration(
+                    color: p.card, borderRadius: R.rPill, border: Border.all(color: p.line)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(a.icon, size: 16, color: p.glass ? p.on(p.tint) : p.ink2),
+                  const SizedBox(width: S.x2),
+                  Flexible(
+                    child: Text(a.name,
+                        style: F.cap.copyWith(color: p.ink, fontWeight: FontWeight.w600)),
+                  ),
+                ]),
+              ),
+            ),
+        ]),
+      ),
+      Section(
+        loc?.workoutThisWeek ?? 'This week',
+        p.metro ? _lineWeekRows(c, p, week, today) : RowGroup([dots, ...sessionRows]),
+        action: 'History',
+        onAction: () => setState(() => tab = 2),
+      ),
+      Section(
+        loc?.activityStepsFoodTitle ?? 'Steps and food',
+        RowGroup([
+          ListRow(
+              icon: LucideIcons.footprints,
+              title: loc?.homeSteps ?? 'Steps',
+              sub: loc?.activityStepsSub ?? 'Today and every day before it',
+              onTap: () => Navigator.of(c).push(MaterialPageRoute<void>(
+                  builder: (_) => const MetricDetail('steps')))),
+          ListRow(
+              icon: LucideIcons.utensils,
+              title: loc?.nutritionTitle ?? 'Nutrition',
+              sub: loc?.activityNutritionSub ?? 'Log food and see today\'s protein',
+              onTap: () => Navigator.of(c).push(MaterialPageRoute<void>(
+                  builder: (_) => const NutritionScreen(page: true)))),
+        ]),
+      ),
+      Section(
+        loc?.workoutTrainingLoad ?? 'Training load',
+        Column(children: [
+          _loadCard(c, p, d),
+          if (d.overreach != null) ...[
+            const SizedBox(height: S.x3),
+            _overreachCard(c, d.overreach!),
+          ],
+          if (d.tonnage7.any((v) => v != null)) ...[
+            const SizedBox(height: S.x3),
+            _tonnageCard(c, p, d),
+          ],
+        ]),
+        action: loc?.workoutTodaysStrainAction ?? "Today's strain",
+        onAction: () => Navigator.of(c)
+            .push(MaterialPageRoute(builder: (_) => const DayStrainDetail())),
+      ),
+    ];
+  }
+
   // ─────────────── FOR YOU ───────────────
   List<Widget> _forYou(BuildContext c, _WorkoutData d) {
     final p = P.of(c);
     final loc = AppLocalizations.of(c);
+    if (p.metro || p.glass) return _forYouRefined(c, p, d);
     return [
       if (p.metro)
         // Line: the start is a sign with one gold action, not an
@@ -2052,6 +2285,9 @@ class _PastWorkout {
 
 class _WorkoutData {
   final double? weightKg;
+
+  /// Today's strain, or its learning envelope ("need_baseline:have=2,need=3").
+  final Metric strainToday;
   final _Load? load;
   final String? loadNote;
 
@@ -2114,6 +2350,7 @@ class _WorkoutData {
 
   const _WorkoutData({
     this.weightKg,
+    this.strainToday = Metric.empty,
     this.load,
     this.loadNote,
     this.trimp7 = const [],
@@ -2161,6 +2398,13 @@ Future<_WorkoutData> _loadWorkoutData(AppState app) async {
     } catch (_) {
       insights = const {};
     }
+
+    // Today's strain for the "Strain so far" card (Line and Glass).
+    var strainToday = Metric.empty;
+    try {
+      final daily = (await repo.getToday())['daily'];
+      strainToday = Metric.parse(daily is Map ? daily["strain"] : null);
+    } catch (_) {}
 
     _Load? load;
     String? note;
@@ -2363,6 +2607,7 @@ Future<_WorkoutData> _loadWorkoutData(AppState app) async {
     final history = await loadSetHistory();
 
     return _WorkoutData(
+      strainToday: strainToday,
       weightKg: weight,
       load: load,
       loadNote: note,

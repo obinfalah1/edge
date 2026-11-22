@@ -1,3 +1,4 @@
+import '../guides/help_entry.dart' show HeaderActions, GuideTopic;
 import '../../l10n/display_text.dart';
 // SLEEP — one question, answered in three seconds, then revealed by scrolling.
 //
@@ -30,7 +31,6 @@ import '../../state/locale_controller.dart';
 import '../../state/prefs.dart';
 import '../../models/metric.dart';
 import '../profile/devices.dart' show DeviceFilter;
-import '../profile/profile.dart' show ProfileAvatar;
 import '../ui2.dart';
 import 'home_screen.dart';
 import 'investigate.dart';
@@ -507,7 +507,7 @@ class _SleepDetailState extends State<SleepDetail> with RevisionReload {
         padding: const EdgeInsets.fromLTRB(S.x4, S.x4, S.x4, S.x16 * 2),
         children: [
           ScreenTitle(title,
-              trailing: const ProfileAvatar(accent: C.domSleep)),
+              trailing: const HeaderActions(topic: GuideTopic.sleep, accent: C.domSleep)),
           if (sub.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(left: S.x1, bottom: S.x2),
@@ -846,9 +846,10 @@ class _SleepDetailState extends State<SleepDetail> with RevisionReload {
     // one night on disk there is no stepper, and then the subtitle is the only
     // thing that dates the screen, so it names the day the way the stepper
     // would rather than printing the raw yyyy-MM-dd key.
+    final rf = p.metro || p.glass;
     return _frame(c, title,
-        sub: d.days.length < 2 ? dayNavLabel(d.day, l).toUpperCase() : '', [
-      ...dayNavRow(_day ?? d.day, d.days, _goDay),
+        sub: rf ? _nightName(d.day) : (d.days.length < 2 ? dayNavLabel(d.day, l).toUpperCase() : ''), [
+      ...dayNavRow(_day ?? d.day, d.days, _goDay, night: rf),
 
       // ── 1 · THE ANSWER ──
       _answer(c, p, d, n),
@@ -884,8 +885,12 @@ class _SleepDetailState extends State<SleepDetail> with RevisionReload {
         _night(c, p, d, n),
 
       // ── 2b · WHOSE WINDOW IS THIS ──
-      ...?_windowCard(c, p, d, n),
-      ..._napsButton(c, l, d.day),
+      // Line and Glass: reading comes first; fixing a night and naps move to
+      // "More" at the end (the same card and the same door).
+      if (!rf) ...[
+        ...?_windowCard(c, p, d, n),
+        ..._napsButton(c, l, d.day),
+      ],
 
       // ── 3 · WHAT IT WAS MADE OF ──
       Section(l?.sleepDetailStagesSection ?? 'Stages', _stages(c, p, n)),
@@ -918,6 +923,23 @@ class _SleepDetailState extends State<SleepDetail> with RevisionReload {
       if (d.isLatestNight && !widget.embedded)
         Section(l?.sleepDetailTonightSection ?? 'Tonight', _tonight(c, p, d)),
 
+      if (rf) ...[
+        if (_windowCard(c, p, d, n) case final w?)
+          Section('Fix this night', Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: w)),
+        Section('More', RowGroup([
+          if (d.day != null)
+            ListRow(
+                icon: LucideIcons.moon,
+                title: l?.sleepDetailEditNaps ?? 'Naps',
+                sub: 'Naps on this day',
+                onTap: _saving || _loading ? null : () => go(c, NapsScreen(day: d.day!))),
+          ListRow(
+              icon: LucideIcons.info,
+              title: 'Night details',
+              sub: 'The numbers behind the picture',
+              onTap: () => go(c, Investigate('sleep', day: _day ?? d.day))),
+        ])),
+      ] else ...[
       const SizedBox(height: S.x5),
       // The night this screen is steered to, not the newest one. Dropping it
       // meant stepping back to Tuesday and then tapping Nerd stats landed
@@ -925,12 +947,23 @@ class _SleepDetailState extends State<SleepDetail> with RevisionReload {
       // came from.
       investigateRow(
           c, () => go(c, Investigate('sleep', day: _day ?? d.day))),
+      ],
     ]);
   }
 
   /// Total sleep, when it ran, and the two ratios that qualify it. Everything
   /// here is measured; nothing is a judgement.
+  /// "Saturday night into Sunday", from the wake day's key.
+  static String _nightName(String? day) {
+    final t = day == null ? null : DateTime.tryParse(day);
+    if (t == null) return '';
+    const n = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    final prev = DateTime(t.year, t.month, t.day - 1);
+    return '${n[prev.weekday - 1]} night into ${n[t.weekday - 1]}';
+  }
+
   Widget _answer(BuildContext c, P p, SleepData d, Map<String, dynamic> n) {
+    if (p.metro || p.glass) return _answerRefined(c, p, d, n);
     final l = AppLocalizations.of(c);
     final tst = n['duration_min'] as num?;
     final eff = n['efficiency'] as num?;
@@ -985,6 +1018,48 @@ class _SleepDetailState extends State<SleepDetail> with RevisionReload {
             style: F.over.copyWith(color: p.ink3, height: 1.5),
           ),
         ],
+      ]),
+    );
+  }
+
+  /// Line and Glass: the total against the need, when it ran, and three
+  /// plain facts (in bed, asleep for, short of need), in sentence case.
+  Widget _answerRefined(BuildContext c, P p, SleepData d, Map<String, dynamic> n) {
+    final tst = n['duration_min'] as num?;
+    final eff = n['efficiency'] as num?;
+    final inBed = n['in_bed_min'] as num?;
+    final from = clockOfTs(n['onset_ts'] as num?);
+    final to = clockOfTs(n['wake_ts'] as num?);
+    final need = d.isLatestNight ? d.need.value : null;
+    final short = need != null && tst != null && need > tst ? need - tst : null;
+    Widget fact(String k, String v) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(k, style: F.cap.copyWith(color: p.ink3)),
+          Text(v, style: F.n24.copyWith(color: p.ink)),
+        ]);
+    return Surface(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text.rich(TextSpan(children: [
+          TextSpan(text: tst == null ? '–' : hmSpaced(tst), style: F.n48.copyWith(color: p.ink, fontWeight: FontWeight.w300)),
+          if (need != null)
+            TextSpan(text: '  of ${hmSpaced(need).replaceAll(' 00', '')} need', style: F.body.copyWith(color: p.ink3)),
+        ])),
+        if (from.isNotEmpty && to.isNotEmpty) ...[
+          const SizedBox(height: S.x3),
+          Row(children: [
+            Icon(LucideIcons.moon, size: 15, color: p.on(C.blue)),
+            const SizedBox(width: S.x2),
+            Flexible(
+              child: Text('$from to $to',
+                  style: F.body.copyWith(color: p.ink, fontWeight: FontWeight.w500)),
+            ),
+          ]),
+        ],
+        const SizedBox(height: S.x4),
+        Wrap(spacing: S.x6, runSpacing: S.x3, children: [
+          if (inBed != null) fact('In bed', hmSpaced(inBed)),
+          if (eff != null) fact('Asleep for', _pct(eff * 100)),
+          if (short != null) fact('Short of need', hmSpaced(short)),
+        ]),
       ]),
     );
   }
@@ -2087,6 +2162,23 @@ class _SleepDetailState extends State<SleepDetail> with RevisionReload {
     // was slop; "3 of 7 nights so far" is the one thing on this card a user can
     // act on — it says the comparison is coming and when. Dropping the whole
     // card took the count with it.
+    if ((rows.isEmpty || have < _minNights) && (p.metro || p.glass)) {
+      // Line and Glass: the same count as a track, like every other
+      // "still learning" on these screens.
+      final h = have.clamp(0, _minNights);
+      return Surface(
+        pad: EdgeInsets.zero,
+        child: TrackRow(
+          title: 'Nights so far',
+          value: '$h',
+          unit: 'of $_minNights',
+          fill: h / _minNights,
+          stops: _minNights,
+          color: p.on(C.blue),
+          note: 'Your usual sleep shows after $_minNights nights with the band.',
+        ),
+      );
+    }
     if (rows.isEmpty || have < _minNights) {
       return StatusCard(
         l?.sleepDetailNotEnoughNightsTitle ?? 'Not enough nights to compare',

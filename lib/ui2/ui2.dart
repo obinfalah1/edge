@@ -18,6 +18,7 @@ export 'moving_backdrop.dart';
 export 'glass_look.dart';
 export 'metro_day.dart';
 export 'revision.dart';
+export 'rows.dart';
 export 'scroll_hint.dart';
 export 'sleep_ring_model.dart';
 export 'spiral_ring.dart';

@@ -123,6 +123,28 @@ Widget alarmGlanceCard(BuildContext c, DateTime? at, AlarmArmState state,
       );
     });
 
+/// The same alarm as [alarmGlanceCard], as a list row (Line and Glass).
+Widget alarmGlanceRow(BuildContext c, DateTime? at, AlarmArmState state,
+        {DateTime? now, String? title}) =>
+    _AlarmTick.wrap(at, now, (n) {
+      final l = AppLocalizations.of(c);
+      final (fig, ap) = splitClock(at == null ? '' : AlarmScreenView._hhmm(at));
+      final label = AlarmScreenView._localizedStateLabel(c, state);
+      return ListRow(
+        icon: LucideIcons.alarmClock,
+        title: title ?? (l?.alarmNavTitle ?? 'Alarm'),
+        sub: at == null
+            ? (l?.alarmSetAnAlarm ?? 'Set an alarm')
+            : at.isAfter(n)
+                ? '${AlarmScreenView._whichDay(c, at, n)}, ${label.toLowerCase()}'
+                    '${state == AlarmArmState.confirmed ? ' on the band' : ''}'
+                : (l?.alarmGlanceInThePast ?? 'Fired or missed'),
+        value: at == null ? (l?.alarmStateNotSet ?? 'Not set') : fig,
+        unit: ap,
+        onTap: () => go(c, const AlarmScreen()),
+      );
+    });
+
 /// Rebuilds [build] at the two moments its text goes stale on its own: when
 /// the armed alarm passes (upcoming → fired or missed) and at local midnight
 /// (Tomorrow → Later today). Home rebuilds only on new data or a changed
@@ -338,6 +360,7 @@ class AlarmScreenView extends StatelessWidget {
     final at = armedAt;
     final fired = firedAt;
     final anyDayEnabled = schedule.any((d) => d.enabled);
+    if (p.metro || p.glass) return _refined(c);
     return Scaffold(
       backgroundColor: p.bg,
       body: SafeArea(
@@ -491,6 +514,409 @@ class AlarmScreenView extends StatelessWidget {
         ]),
       ),
     );
+  }
+
+  // ── Line and Liquid Glass ────────────────────────────────────────────────
+  //
+  // The same settings and the same calls, laid out for a glance: one card
+  // with the next alarm and whether the band has it, the Fajr numbers as
+  // plain rows, the four prayers as switches, the week as seven day buttons
+  // with a row only for each day that is on, and both tests together at the
+  // bottom where the thumb is.
+
+  static const _weekdayNames = [
+    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
+  ];
+
+  Widget _refined(BuildContext c) {
+    final p = P.of(c);
+    final l = AppLocalizations.of(c);
+    final at = armedAt;
+    final fired = firedAt;
+    final f = fajr;
+    final anyDayEnabled = schedule.any((d) => d.enabled);
+    final n = now ?? DateTime.now();
+    final isFajr = at != null &&
+        f != null &&
+        f.enabled &&
+        fajrNext != null &&
+        fajrNext!.difference(at).inMinutes.abs() < 1;
+    Widget section(String t) => Padding(
+          padding: const EdgeInsets.fromLTRB(S.x1, S.x5, S.x1, S.x2),
+          child: Text(t,
+              style: F.t2.copyWith(
+                  color: p.ink,
+                  fontFamily: p.metro ? LineTok.display : null,
+                  fontWeight: p.metro ? FontWeight.w500 : FontWeight.w700)),
+        );
+    Widget caption(String t) => Padding(
+          padding: const EdgeInsets.fromLTRB(S.x2, S.x2, S.x2, 0),
+          child: Text(t, style: F.cap.copyWith(color: p.ink3)),
+        );
+    return Scaffold(
+      backgroundColor: p.bg,
+      body: SafeArea(
+        child: Column(children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: S.x4),
+            child: NavBar(l?.alarmNavTitle ?? 'Alarm'),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(S.x4, 0, S.x4, S.x10),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(S.x1, 0, S.x1, S.x3),
+                  child: Text('The band buzzes on its own clock, phone locked or not.',
+                      style: F.cap.copyWith(color: p.ink3)),
+                ),
+                if (fired != null && calendarDaysBetween(fired, n) == 0) ...[
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Pill(
+                        l?.alarmFiredAt(_hhmm(fired)) ?? 'Fired at ${_hhmm(fired)}',
+                        C.green,
+                        icon: LucideIcons.alarmClockCheck),
+                  ),
+                  const SizedBox(height: S.x3),
+                ],
+                if (at != null) _hero(c, at, n, isFajr),
+                if (at != null && state != AlarmArmState.confirmed)
+                  if (_stateDetail(c, state) case final detail?) ...[
+                    const SizedBox(height: S.x3),
+                    StatusCard(_stateHeadline(c, state), detail, icon: _stateIcon(state)),
+                  ],
+                if (f != null) ...[
+                  section(_fajrText('Fajr alarm')),
+                  _fajrRows(c, f, showNext: !isFajr),
+                ],
+                if (prayer != null) ...[
+                  section('Prayer buzzes'),
+                  _prayerRows(c, prayer!),
+                  if (fajrSource != null && fajrSource != 'none')
+                    caption('Times for ${_whereText().toLowerCase()}, UAE calculation.'),
+                ],
+                if (!connected) ...[
+                  const SizedBox(height: S.x4),
+                  StatusCard(
+                    l?.alarmNotConnectedTitle ?? 'The band is not connected',
+                    l?.alarmNotConnectedBody ??
+                        'Changing, testing or cancelling the alarm needs a live connection. An alarm that is already set still works; it lives on the band.',
+                    icon: LucideIcons.bluetoothOff,
+                  ),
+                ] else ...[
+                  section('Weekly alarm'),
+                  _weekRows(c),
+                  caption('Tap a day to turn its alarm on or off.'),
+                  if ((f != null && f.enabled) || at != null || anyDayEnabled) ...[
+                    section('Check it works'),
+                    if (f != null && f.enabled)
+                      PrimaryButton(_fajrText('Test the Fajr buzz in 1 minute'),
+                          icon: LucideIcons.vibrate,
+                          onTap: () => _run(c, onTestFajr,
+                              _fajrText('Test alarm set — the band buzzes in about a minute'))),
+                    if (at != null) ...[
+                      const SizedBox(height: S.x3),
+                      SecondaryButton('Test the alarm buzz',
+                          onTap: () => _run(
+                              c, onTest, l?.alarmBuzzingTheBand ?? 'Buzz sent to the band')),
+                    ],
+                    if (at != null || anyDayEnabled) ...[
+                      const SizedBox(height: S.x2),
+                      Center(
+                        child: TextButton(
+                          style: TextButton.styleFrom(
+                              foregroundColor: p.on(C.red),
+                              minimumSize: const Size(0, 44)),
+                          onPressed: () => _confirmCancel(c),
+                          child: Text(l?.alarmCancelTheAlarm ?? 'Cancel the alarm',
+                              style: F.body.copyWith(fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                    ],
+                  ],
+                ],
+              ],
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+
+  /// The next alarm: the time large, where it comes from, and whether the
+  /// band has it. Line sets it on the signage panel; Glass on a glass card.
+  Widget _hero(BuildContext c, DateTime at, DateTime n, bool isFajr) {
+    final p = P.of(c);
+    final onSign = p.metro;
+    final ink = onSign ? LineTok.signInk : p.ink;
+    final mute = onSign ? LineTok.signMute : p.ink3;
+    final (fig, ap) = splitClock(_hhmm(at));
+    final from = isFajr && fajrPrayer != null
+        ? 'Fajr ${_hhmm(fajrPrayer!)}, plus ${fajr!.offsetMinutes} min'
+        : _weekdayNames[(at.weekday - 1) % 7];
+    final ok = state == AlarmArmState.confirmed;
+    final stateColor = ok
+        ? (onSign ? C.signGreen : p.on(C.green))
+        : (onSign ? LineTok.signMute : p.ink3);
+    final stateText = ok ? 'Confirmed on the band' : _localizedStateLabel(c, state);
+    final body = Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Next alarm, ${_whichDay(c, at, n).toLowerCase()}', style: F.cap.copyWith(color: mute)),
+      const SizedBox(height: S.x1),
+      Text.rich(TextSpan(children: [
+        TextSpan(
+            text: fig,
+            style: F.n48.copyWith(
+                color: ink,
+                fontFamily: p.metro ? LineTok.display : null,
+                fontWeight: FontWeight.w300)),
+        if (ap.isNotEmpty) TextSpan(text: ' $ap', style: F.head.copyWith(color: mute)),
+      ])),
+      const SizedBox(height: S.x2),
+      Wrap(
+          spacing: S.x3,
+          runSpacing: S.x1,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text(from, style: F.cap.copyWith(color: onSign ? LineTok.signMute : p.ink2)),
+            Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(ok ? LucideIcons.check : _stateIcon(state), size: 16, color: stateColor),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(stateText,
+                    style: F.cap.copyWith(color: stateColor, fontWeight: FontWeight.w600)),
+              ),
+            ]),
+          ]),
+    ]);
+    return Semantics(
+      container: true,
+      label: 'Next alarm ${_whichDay(c, at, n)} at ${_hhmm(at)}, $from, $stateText',
+      child: ExcludeSemantics(
+        child: onSign
+            ? Container(
+                padding: const EdgeInsets.all(S.x5),
+                decoration: const BoxDecoration(color: LineTok.sign, borderRadius: R.rMetro),
+                child: body)
+            : Surface(pad: const EdgeInsets.all(S.x5), child: body),
+      ),
+    );
+  }
+
+  String _whereText() => switch (fajrSource) {
+        'gps' => _fajrText('Your location'),
+        'last' => _fajrText('Your last location'),
+        'sharjah' => _fajrText('Sharjah (no location yet)'),
+        _ => _fajrText('Not fetched yet'),
+      };
+
+  Widget _prayerBadge(BuildContext c, String letter, bool on) {
+    final p = P.of(c);
+    if (p.glass) {
+      return rowLead(
+          c,
+          switch (letter) {
+            'F' => LucideIcons.sunrise,
+            'M' || 'I' => LucideIcons.moon,
+            _ => LucideIcons.sun,
+          },
+          color: on ? C.prayer : p.ink3);
+    }
+    return Container(
+      width: 34,
+      height: 34,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+          color: on ? LineTok.lapis : p.card2, borderRadius: R.rMd),
+      child: Text(letter,
+          style: F.body.copyWith(
+              color: on ? LineTok.sign : p.ink3,
+              fontFamily: LineTok.display,
+              fontWeight: FontWeight.w600)),
+    );
+  }
+
+  Widget _fajrRows(BuildContext c, FajrAlarmSettings f, {required bool showNext}) {
+    Future<void> set({bool? on, int? off, int? n, int? gap}) async {
+      if (onSetFajr == null) return;
+      await onSetFajr!(enabled: on, offsetMinutes: off, buzzCount: n, pauseSteps: gap);
+    }
+    void toggle() {
+      selectHaptic();
+      _run(c, () => set(on: !f.enabled),
+          f.enabled ? _fajrText('Fajr alarm off') : _fajrText('Fajr alarm on — sent to the band'));
+    }
+    final buzz = fajrNext;
+    return RowGroup([
+      ListRow(
+        leading: _prayerBadge(c, 'F', f.enabled),
+        title: _fajrText('Fajr alarm'),
+        sub: 'Every day, from your prayer times',
+        trailing: Switch.adaptive(value: f.enabled, onChanged: onSetFajr == null ? null : (_) => toggle()),
+        chevron: false,
+        onTap: onSetFajr == null ? null : toggle,
+      ),
+      if (f.enabled) ...[
+        if (showNext)
+          ListRow(
+              title: 'Next Fajr buzz',
+              detail: buzz == null
+                  ? _fajrText('Fetching prayer times…')
+                  : '${_whichDay(c, buzz, now ?? DateTime.now())}, ${_hhmm(buzz)}'),
+        ListRow(
+            title: _fajrText('Minutes after Fajr'),
+            detail: '${f.offsetMinutes} min',
+            onTap: () => _pickNumber(c, _fajrText('Minutes after Fajr'),
+                const [0, 5, 10, 15, 20, 25, 30, 45, 60, 90, 120], (m) => '$m min', (m) => set(off: m))),
+        ListRow(
+            title: _fajrText('Buzzes'),
+            detail: '${f.buzzCount}',
+            onTap: () => _pickNumber(c, _fajrText('Buzzes'),
+                [for (var i = 1; i <= 10; i++) i, 15, 20], (n) => '$n', (n) => set(n: n))),
+        ListRow(
+            title: 'Gap between buzzes',
+            detail: '${(f.pauseSteps * FajrAlarmSettings.pauseStepMs / 1000).toStringAsFixed(1)} s',
+            onTap: () => _pickNumber(c, 'Gap between buzzes',
+                [for (var i = 1; i <= FajrAlarmSettings.maxPause; i++) i], _pauseLabel, (g) => set(gap: g))),
+        ListRow(
+            title: _fajrText('Prayer times for'),
+            detail: _whereText(),
+            onTap: () => _run(c, onRefreshFajr, _fajrText('Prayer times updated'))),
+      ],
+    ]);
+  }
+
+  Widget _prayerRows(BuildContext c, PrayerBuzzSettings s) {
+    Future<void> set({Prayer? toggle, int? off, int? n}) async {
+      if (onSetPrayer == null) return;
+      await onSetPrayer!(toggle: toggle, offsetMinutes: off, buzzCount: n);
+    }
+    void toggle(Prayer pr) {
+      selectHaptic();
+      final on = !s.isOn(pr);
+      _run(c, () => set(toggle: pr), on ? '${pr.api} buzz on' : '${pr.api} buzz off');
+    }
+    return RowGroup([
+      for (final pr in Prayer.values)
+        ListRow(
+          leading: _prayerBadge(c, pr.api.substring(0, 1), s.isOn(pr)),
+          title: pr.label(false),
+          sub: prayerToday[pr] == null ? null : _hhmm(prayerToday[pr]!),
+          trailing: Switch.adaptive(
+              value: s.isOn(pr), onChanged: onSetPrayer == null ? null : (_) => toggle(pr)),
+          chevron: false,
+          onTap: onSetPrayer == null ? null : () => toggle(pr),
+        ),
+      if (s.anyOn) ...[
+        ListRow(
+            title: 'Minutes after the adhan',
+            detail: '${s.offsetMinutes} min',
+            onTap: () => _pickNumber(c, 'Minutes after the adhan',
+                const [0, 5, 10, 15, 20, 30, 45, 60], (m) => '$m min', (m) => set(off: m))),
+        ListRow(
+            title: 'Buzzes',
+            detail: '${s.buzzCount}',
+            onTap: () => _pickNumber(c, 'Buzzes', [for (var i = 1; i <= 10; i++) i], (n) => '$n',
+                (n) => set(n: n))),
+      ],
+    ]);
+  }
+
+  Widget _weekRows(BuildContext c) {
+    final p = P.of(c);
+    final on = p.metro ? LineTok.lapis : p.fill(p.tint);
+    final onInk = p.metro ? LineTok.sign : p.inkOnFill;
+    const letters = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+    final days = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: S.x3, vertical: S.x3),
+      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+        for (final day in schedule)
+          Pressable(
+            semanticLabel:
+                '${_weekdayNames[day.weekday % 7]} alarm, ${day.enabled ? 'on' : 'off'}',
+            onTap: onToggleDay == null
+                ? null
+                : () {
+                    selectHaptic();
+                    _run(c, () => onToggleDay!(day.weekday, !day.enabled), null);
+                  },
+            child: Container(
+              width: 40,
+              height: 40,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                  shape: BoxShape.circle, color: day.enabled ? on : p.card2),
+              child: Text(letters[day.weekday % 7],
+                  style: F.body.copyWith(
+                      color: day.enabled ? onInk : p.ink2,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: p.metro ? LineTok.display : null)),
+            ),
+          ),
+      ]),
+    );
+    return RowGroup([
+      days,
+      for (final day in schedule)
+        if (day.enabled)
+          Builder(builder: (c) {
+            final (fig, ap) = splitClock(_hhmmOf(day.hour, day.minute));
+            return ListRow(
+              title: _weekdayNames[day.weekday % 7],
+              sub: day.smartWindowMinutes == 0
+                  ? 'Smart wake off'
+                  : 'Smart wake ${day.smartWindowMinutes} min early',
+              value: fig,
+              unit: ap,
+              onTap: () => _dayOptions(c, day),
+            );
+          }),
+    ]);
+  }
+
+  /// A day's two settings, as an iOS action sheet: its wake time and its
+  /// smart wake window.
+  Future<void> _dayOptions(BuildContext c, AlarmScheduleEntry day) async {
+    final pick = await showModalBottomSheet<int>(
+      context: c,
+      backgroundColor: P.of(c).cardSolid,
+      builder: (ctx) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+              title: Text('Change the wake time (${_hhmmOf(day.hour, day.minute)})'),
+              onTap: () => Navigator.pop(ctx, 0)),
+          ListTile(
+              title: Text(day.smartWindowMinutes == 0
+                  ? 'Smart wake: off'
+                  : 'Smart wake: ${day.smartWindowMinutes} min early'),
+              onTap: () => Navigator.pop(ctx, 1)),
+        ]),
+      ),
+    );
+    if (pick == null || !c.mounted) return;
+    if (pick == 0 && onSetDayTime != null) await _pickDayTime(c, day);
+    if (pick == 1 && onSetSmartWindow != null && c.mounted) await _pickSmartWindow(c, day);
+  }
+
+  Future<void> _confirmCancel(BuildContext c) async {
+    final l = AppLocalizations.of(c);
+    final yes = await showAdaptiveDialog<bool>(
+      context: c,
+      builder: (ctx) => AlertDialog.adaptive(
+        title: const Text('Cancel the alarm?'),
+        content: const Text('The band will not buzz until you set an alarm again.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep it')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l?.alarmCancelTheAlarm ?? 'Cancel the alarm',
+                  style: TextStyle(color: P.of(ctx).on(C.red)))),
+        ],
+      ),
+    );
+    if (yes == true && c.mounted) {
+      await _run(c, onCancel, l?.alarmCancelled ?? 'Alarm cancelled');
+    }
   }
 
   /// The Fajr alarm group: on/off, the next Fajr and buzz time, the three
