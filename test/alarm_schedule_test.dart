@@ -430,4 +430,24 @@ void main() {
       expect(run(45), isFalse);
     });
   });
+
+  group('alarmMayBeRinging', () {
+    final fired = DateTime(2026, 11, 22, 5, 34, 1);
+    test('holds the re-arm while the band may still be buzzing', () {
+      expect(alarmMayBeRinging(fired, fired.add(const Duration(seconds: 1))),
+          isTrue);
+      expect(alarmMayBeRinging(fired, fired.add(const Duration(seconds: 59))),
+          isTrue);
+    });
+    test('lets it through once the longest pattern is over', () {
+      expect(alarmMayBeRinging(fired, fired.add(kAlarmRingHold)), isFalse);
+      expect(alarmMayBeRinging(null, fired), isFalse);
+      expect(alarmMayBeRinging(fired, fired.subtract(const Duration(hours: 1))),
+          isFalse);
+    });
+    test('the hold covers the longest pattern the app arms', () {
+      // 20 buzzes with the longest pause: the pattern's own duration byte.
+      expect(kAlarmRingHold.inSeconds, greaterThan(49));
+    });
+  });
 }

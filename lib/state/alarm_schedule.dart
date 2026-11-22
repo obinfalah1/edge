@@ -298,6 +298,20 @@ DateTime alarmRearmFrom(DateTime now, int? firedEpoch) {
   return after.isAfter(now) ? after : now;
 }
 
+/// How long the band may still be buzzing after its alarm fires. The longest
+/// pattern the app arms (20 buzzes with the longest pause) runs about 49 s.
+/// Writing the alarm slot while the pattern plays cuts it off: on 2026-11-22
+/// the Dhuhr re-arm, sent one second after Fajr fired, ended the Fajr buzz
+/// after about 3 s and the wearer slept through it.
+const Duration kAlarmRingHold = Duration(seconds: 60);
+
+/// True while an alarm that fired at [firedAt] may still be buzzing.
+bool alarmMayBeRinging(DateTime? firedAt, DateTime now) {
+  if (firedAt == null) return false;
+  final since = now.difference(firedAt);
+  return since >= const Duration(seconds: -5) && since < kAlarmRingHold;
+}
+
 /// Result of [armNextScheduledOccurrence]. [epoch] is the newly-armed unix
 /// instant, or null when nothing changed on the strap (no enabled day and
 /// already unarmed, the target already matches what's armed, or the write

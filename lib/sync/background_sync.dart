@@ -296,6 +296,16 @@ Future<void> rearmHeadlessAlarm(BleEngine engine, PairedDevice paired) async {
     ]);
     final prefs = await SharedPreferences.getInstance();
     final remoteId = paired.remoteId;
+    // The armed alarm's time just passed: the band may still be buzzing, and
+    // a write now would cut the pattern off (see [kAlarmRingHold]). Leave it;
+    // the next connect re-arms.
+    final armed = persistedAlarmEpoch(prefs, remoteId);
+    if (armed != null &&
+        alarmMayBeRinging(
+            DateTime.fromMillisecondsSinceEpoch(armed * 1000), DateTime.now())) {
+      debugPrint('[bgsync] alarm re-arm held: the band may still be buzzing.');
+      return;
+    }
     // Fajr alarm: top the prayer-time cache up if it is running out (last
     // stored location — no GPS from the background), then arm from it.
     await refreshFajrTimesIfNeeded(prefs, useGps: false);

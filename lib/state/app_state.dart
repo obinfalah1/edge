@@ -2308,6 +2308,8 @@ class AppState extends ChangeNotifier {
     _sync.dispose();
     _alarmGraceTimer?.cancel();
     _alarmGraceTimer = null;
+    _alarmRearmTimer?.cancel();
+    _alarmRearmTimer = null;
     _breathingController.dispose();
     _workoutController.dispose();
     // The sensor's notifier OUTLIVES this object (HrsLink is a singleton), so
@@ -5751,6 +5753,14 @@ class AppState extends ChangeNotifier {
   Future<bool> _armNextAlarmOccurrence(
       {int? firedEpoch, bool force = false}) async {
     if (!isConnected) return false;
+    // The band may still be buzzing for the alarm that just fired; any other
+    // re-arm (a sync, a reconnect) waits for the delayed one in the fired
+    // handler. A user's own change (force) still goes through.
+    if (!force && firedEpoch == null &&
+        alarmMayBeRinging(_alarmFiredAt, DateTime.now())) {
+      _log('[alarm] re-arm held: the band may still be buzzing.');
+      return true;
+    }
     try {
       // A headless re-arm (background_sync.dart) can have rewritten
       // `alarm_epoch`/`alarm_epoch_confirmed` under this same live process
@@ -6089,6 +6099,9 @@ class AppState extends ChangeNotifier {
   // just wires the strap event stream + persistence + the fired notification.
   final AlarmConfirmation _alarm = AlarmConfirmation();
   Timer? _alarmGraceTimer;
+
+  /// The delayed re-arm after a fire (see [kAlarmRingHold]).
+  Timer? _alarmRearmTimer;
   // Event 56 is a one-shot BLE notification — if that single packet gets
   // dropped by an ordinary momentary disconnect right after the write (the
   // band DID latch the alarm), there is no retry/re-poll for it and the
@@ -6526,7 +6539,13 @@ class AppState extends ChangeNotifier {
         // leaves tomorrow unarmed and Home saying "Set an alarm". Computed
         // past the slot that just fired (see [alarmRearmFrom]) so a strap
         // running slightly fast doesn't re-arm the spent slot.
-        unawaited(_armNextAlarmOccurrence(firedEpoch: firedEpoch));
+        // Wait until the band has finished buzzing: a SET_ALARM written while
+        // the pattern plays cuts it off (see [kAlarmRingHold]).
+        _alarmRearmTimer?.cancel();
+        _alarmRearmTimer = Timer(kAlarmRingHold, () {
+          _alarmRearmTimer = null;
+          unawaited(_armNextAlarmOccurrence(firedEpoch: firedEpoch));
+        });
         break;
       case AlarmEffect.buzzed:
         _log('[alarm] RUN_ALARM buzz (event $id), armed slot unchanged.');
