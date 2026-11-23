@@ -306,7 +306,12 @@ Future<void> refreshPrayerTimesIfNeeded(
   Duration timeout = const Duration(seconds: 15),
 }) async {
   final at = now ?? DateTime.now();
-  if (!PrayerBuzzSettings.load(prefs).anyOn) return;
+  // The buzzes are not armed in this build; the times still feed Today, so
+  // they are kept fresh while the Fajr alarm is on.
+  if (!PrayerBuzzSettings.load(prefs).anyOn &&
+      !(prefs.getBool('fajr_alarm_enabled') ?? false)) {
+    return;
+  }
   if (!PrayerTimes.needsRefresh(prefs, at)) return;
   try {
     await PrayerTimes.refresh(prefs, useGps: useGps, now: at).timeout(timeout);

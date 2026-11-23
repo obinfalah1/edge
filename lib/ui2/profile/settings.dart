@@ -211,6 +211,7 @@ class _MoreSettingsState extends State<MoreSettings>
         AppThemeChoice.system => l?.settingsAppearanceSystem ?? theme.choice.label,
         AppThemeChoice.light => l?.settingsAppearanceLight ?? theme.choice.label,
         AppThemeChoice.dark => l?.settingsAppearanceDark ?? theme.choice.label,
+        AppThemeChoice.mid => theme.choice.label,
       },
       clockFormat: clock.format,
       cycleTracking: app.cycleTrackingEnabled,

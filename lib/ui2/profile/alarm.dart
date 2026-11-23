@@ -259,8 +259,6 @@ class AlarmScreen extends StatelessWidget {
       onTestFajr: () async {
         if (await app.testFajrAlarm()) throw Exception(stockPattern);
       },
-      prayer: app.prayerBuzz,
-      prayerNext: app.prayerBuzzNext,
       prayerToday: app.prayerTimesToday,
       onSetPrayer: ({toggle, offsetMinutes, buzzCount}) async {
         final onBandNow = await app.setPrayerBuzz(

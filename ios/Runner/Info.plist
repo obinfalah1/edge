@@ -172,7 +172,7 @@
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>OpenStrap connects to your wearables and sensors over Bluetooth to sync your health data.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>OpenStrap records your route during a run, ride or walk so you can see it, colored by heart-rate zone, when the workout ends. Recording continues while your screen is locked or you switch apps, but only while a workout is running — it stops the moment you finish. Your route stays on this device and is never uploaded.</string>
+	<string>OpenStrap records your route during a run, ride or walk so you can see it, colored by heart-rate zone, when the workout ends. Recording continues while your screen is locked or you switch apps, but only while a workout is running — it stops the moment you finish. Your route stays on this device and is never uploaded. If you switch on the Fajr alarm, your location is also used to get your prayer times.</string>
 	<!-- NSLocationAlwaysAndWhenInUseUsageDescription: STILL not requested by app
 	     code. gps_source.dart asks for WHEN-IN-USE only; background delivery
 	     during a workout comes from the "location" UIBackgroundMode plus

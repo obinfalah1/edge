@@ -1767,6 +1767,11 @@ class AppState extends ChangeNotifier {
       _smartWakeProfileDay = null;
       _smartWakeFiredForEpoch = null;
       _alarmFiredAt = null;
+      // The Fajr alarm's settings went with the prefs; drop the copy too.
+      _fajr = const FajrAlarmSettings();
+      _fajrNext = null;
+      _fajrSource = null;
+      _fajrFetchedAt = null;
 
       // 4 · the in-memory mirrors of what we just deleted. These are plain
       // fields, restored only by the profile load at launch, so leaving them
@@ -5646,7 +5651,7 @@ class AppState extends ChangeNotifier {
   /// Arm the band's alarm one minute from now with the Fajr buzz pattern, so
   /// the user can feel the exact rhythm the band will use at Fajr. The real
   /// next alarm is written back once the test has fired (the strap's fired
-  /// event re-arms) and, as a backstop, 90 s from now. Returns true when the
+  /// event re-arms) and, as a backstop, once it has finished buzzing. Returns true when the
   /// band refused the custom pattern and the stock one was used instead.
   Future<bool> testFajrAlarm() async {
     if (!isConnected) throw Exception('Connect to your strap first');
@@ -5666,7 +5671,9 @@ class AppState extends ChangeNotifier {
     // persisted one so every later re-arm writes the real next alarm again.
     await _clearArmedAlarmState();
     notifyListeners();
-    Timer(const Duration(seconds: 90), () {
+    // Not before the test has fired (60 s) and finished buzzing
+    // ([kAlarmRingHold]): an earlier write would cut a long pattern short.
+    Timer(const Duration(seconds: 60) + kAlarmRingHold + const Duration(seconds: 10), () {
       if (isConnected) unawaited(_armNextAlarmOccurrence(force: true));
     });
     return usedStock;
@@ -5865,7 +5872,6 @@ class AppState extends ChangeNotifier {
         now: from,
         fajr: fajr,
         timer: loadBandTimerPlan(prefs, from),
-        prayers: loadPrayerBuzzPlan(prefs, from),
       );
       if (result.disabled) {
         // Every weekday got disabled since the last arm — the strap doesn't

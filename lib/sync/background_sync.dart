@@ -320,7 +320,6 @@ Future<void> rearmHeadlessAlarm(BleEngine engine, PairedDevice paired) async {
         currentArmedEpoch: persistedAlarmEpoch(prefs, remoteId),
         fajr: fajr,
         timer: loadBandTimerPlan(prefs, DateTime.now()),
-        prayers: loadPrayerBuzzPlan(prefs, DateTime.now()),
       ),
       LocalDb.alarmSetConfirmedSince,
       remoteId: remoteId,
