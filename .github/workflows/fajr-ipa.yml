@@ -27,8 +27,8 @@ jobs:
           echo "ENABLE_HEALTH_DATA_CONTRIBUTION=false" >> .env
       - run: dart pub global activate flutterfire_cli 1.4.0
       - run: flutter pub get
-      - name: Fajr alarm tests
-        run: flutter test test/fajr_alarm_test.dart test/alarm_schedule_test.dart test/alarm_test.dart
+      - name: Fajr alarm and Apple AI tests
+        run: flutter test test/fajr_alarm_test.dart test/alarm_schedule_test.dart test/alarm_test.dart test/coach_apple_test.dart test/backup/settings_audit_guard_test.dart
       - name: Build unsigned iOS app
         run: flutter build ios --release --no-codesign --dart-define-from-file=.env
       - name: Strip Watch companion (can't survive per-user resigning)
