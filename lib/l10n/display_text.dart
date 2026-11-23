@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatf
 import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart' show NumberFormat;
 import 'app_localizations.dart';
+import 'sweep_text.dart';
 
 String uiText(BuildContext context, String text) =>
     localizedText(AppLocalizations.of(context), text);
@@ -105,6 +106,43 @@ String localizedNotificationText(AppLocalizations? l, String text) {
   if (idle != null) {
     return l.notifWorkoutIdleBody(int.parse(idle[1]!));
   }
+  // NotificationCenter.weeklyLookbackFinding: a flag list, or an RHR drift.
+  final flagged =
+      RegExp(r'^This week flagged: (.+)\. Details live on Health\.$')
+          .firstMatch(text);
+  if (flagged != null) {
+    String part(String p) {
+      final m = RegExp(r'^(.+) ×(\d+)$').firstMatch(p);
+      if (m == null) return p;
+      final n = int.parse(m[2]!);
+      return switch (m[1]) {
+        'resting heart rate raised' => l.notifLookbackIllness(n),
+        'unusual physiology' => l.notifLookbackAnomaly(n),
+        'elevated skin temperature' => l.notifLookbackTemp(n),
+        _ => p,
+      };
+    }
+    return l.notifLookbackFlaggedBody(
+        flagged[1]!.split(', ').map(part).join(', '));
+  }
+  final drift = RegExp(
+    r'^Resting heart rate ran about (\d+) bpm (higher|lower) late in the week than early\.$',
+  ).firstMatch(text);
+  if (drift != null) {
+    final bpm = int.parse(drift[1]!);
+    return drift[2] == 'higher'
+        ? l.notifLookbackRhrHigherBody(bpm)
+        : l.notifLookbackRhrLowerBody(bpm);
+  }
+  final stale = RegExp(
+    r'^No new data for about (\d+) hours\. Open OpenStrap to reconnect — background sync may have stalled\.$',
+  ).firstMatch(text);
+  if (stale != null) {
+    return l.notifSyncStaleBody(int.parse(stale[1]!));
+  }
+  // The evening sweep notification's body is the finding line itself.
+  final sweep = sweepText(l, text);
+  if (sweep != text) return sweep;
   return localizedText(l, text);
 }
 
@@ -117,6 +155,20 @@ String localizedText(AppLocalizations? l, String text) {
     return l.findingLowReadinessScoredDetail(int.parse(lowScore[1]!));
   }
   return switch (text) {
+    "Apple Intelligence on this iPhone" => l.coachAppleTitle,
+    "Needs iOS 26 and Apple Intelligence turned on. No key needed." => l.coachAppleSub,
+    "Checking Apple Intelligence…" => l.coachAppleChecking,
+    "The coach, briefings and journal now use Apple’s small on-device model. It answers from your last two weeks and can’t log things for you; switch it off to use a bigger model instead." => l.coachAppleOnNote,
+    "Ready." => l.coachAppleReady,
+    "Turn on Apple Intelligence in Settings to use the on-device model." => l.coachAppleNotEnabled,
+    "Apple’s on-device model is still downloading. Try again later." => l.coachAppleNotReady,
+    "This iPhone can’t run Apple’s on-device model." => l.coachAppleNotEligible,
+    "Needs an iPhone with Apple Intelligence on iOS 26 or later." => l.coachAppleUnsupported,
+    "Apple’s on-device model couldn’t answer. Try again." => l.coachAppleFailed,
+    "That was too long for Apple’s on-device model. Start a new chat or ask a shorter question." => l.coachAppleTooLong,
+    "Apple’s on-device model declined to answer that. Try wording it differently." => l.coachAppleDeclined,
+    "Apple’s on-device model took too long to answer. Try again, or ask a shorter question." => l.coachAppleTimeout,
+    "Apple’s on-device model can’t read an ECG waveform. To analyse this reading, switch Apple Intelligence off in the coach’s AI settings and use another model." => l.coachAppleNoEcg,
     "Resting heart rate has been raised" => l.findingIllnessTitle,
     "Recent nights put your resting heart rate above your usual, from one very high night or a few slightly raised ones. One signal: a pattern, not a cause." =>
       l.findingIllnessDetail,

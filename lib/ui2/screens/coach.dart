@@ -21,6 +21,7 @@ import 'coach_text.dart';
 
 import '../../data/db.dart';
 import '../../l10n/display_text.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import '../../coach/coach_apple.dart';
 import 'package:gpt_markdown/gpt_markdown.dart';
@@ -37,7 +38,6 @@ import '../../state/app_state.dart';
 import '../ui2.dart';
 import 'ai_briefing.dart';
 import 'coach_figures.dart';
-import '../../l10n/personal_text.dart';
 import 'home_screen.dart' show go, pad, repoOf;
 import 'journal_compose.dart' show OsTextField;
 
@@ -124,6 +124,14 @@ class _CoachScreenState extends State<CoachScreen> {
 
   static List<String> _starters(BuildContext c) {
     final l = AppLocalizations.of(c);
+    // Apple's on-device model answers from the last two weeks and cannot
+    // chart or log, so it is offered only the questions it can answer.
+    if (c.watch<CoachConfig>().usesApple) {
+      return [
+        l?.coachStarterRecovery ?? 'How recovered am I today, and why?',
+        l?.coachStarterSleep ?? 'How has my sleep been this week?',
+      ];
+    }
     return [
       l?.coachStarterRecovery ?? 'How recovered am I today, and why?',
       l?.coachStarterHrvChart ?? 'Chart my HRV over the last month',
@@ -930,7 +938,7 @@ class CoachSetup extends StatefulWidget {
   State<CoachSetup> createState() => _CoachSetupState();
 }
 
-class _CoachSetupState extends State<CoachSetup> {
+class _CoachSetupState extends State<CoachSetup> with WidgetsBindingObserver {
   late final TextEditingController _base;
   late final TextEditingController _key;
   late final TextEditingController _search;
@@ -983,14 +991,16 @@ class _CoachSetupState extends State<CoachSetup> {
     _key = TextEditingController(text: cfg.apiKey ?? '');
     _search = TextEditingController();
     _timeout = TextEditingController(text: cfg.timeoutSeconds.toString());
-    _api = cfg.api;
-    _chatgpt = cfg.usesChatGpt;
+    // The saved bring-your-own route and model, not the Apple display values:
+    // they are what switching Apple off must bring back.
+    _chatgpt = cfg.savedUsesChatGpt;
+    _api = _chatgpt ? CoachApi.responses : cfg.api;
     _apple = cfg.usesApple;
-    AppleOnDevice.status().then((st) {
-      if (mounted) setState(() => _appleStatus = st);
-    });
+    _refreshAppleStatus();
+    // Apple Intelligence may be turned on in Settings while this is open.
+    WidgetsBinding.instance.addObserver(this);
     _chatgptAuth = cfg.chatgpt;
-    _model = cfg.model;
+    _model = cfg.savedModel;
     _keyOrigin = coachEndpointOrigin(cfg.baseUrl);
     // The base URL decides which preset is lit and whether a key is needed, and
     // the search box filters the list — both are read during build, so both
@@ -1044,7 +1054,19 @@ class _CoachSetupState extends State<CoachSetup> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _refreshAppleStatus();
+  }
+
+  Future<AppleAiStatus> _refreshAppleStatus() async {
+    final st = await AppleOnDevice.status();
+    if (mounted) setState(() => _appleStatus = st);
+    return st;
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (_signingIn) _chatgptAuth.cancelSignIn();
     _base.dispose();
     _key.dispose();
@@ -1406,45 +1428,73 @@ class _CoachSetupState extends State<CoachSetup> {
           Expanded(
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(tr(c, 'Apple Intelligence on this iPhone', 'Apple Intelligence على هذا الآيفون'),
+              Text(uiText(c, 'Apple Intelligence on this iPhone'),
                   style: F.head.copyWith(color: p.ink)),
-              Text(tr(c, 'Free, offline, private. No key needed.', 'مجاني وبلا إنترنت وخاص. لا يحتاج إلى مفتاح.'),
+              Text(uiText(c, 'Needs iOS 26 and Apple Intelligence turned on. No key needed.'),
                   style: F.cap.copyWith(color: p.ink2)),
             ]),
           ),
           Switch.adaptive(
             value: _apple,
-            onChanged: (on) async {
-              if (on && st != null && !ready) {
-                setState(() => _appleMsg = st.text(isArabic(context)));
-                return;
-              }
-              await context.read<CoachConfig>().save(useApple: on);
-              if (mounted) {
-                setState(() {
-                  _apple = on;
-                  _appleMsg = null;
-                  _msg = null;
-                });
-              }
-            },
+            // Off until the first availability check is in: nothing is saved
+            // on a guess.
+            onChanged: st == null
+                ? null
+                : (on) async {
+                    final cfg = context.read<CoachConfig>();
+                    if (on) {
+                      // Checked again, not the cached status: the user may
+                      // have just turned Apple Intelligence on in Settings.
+                      final fresh = await _refreshAppleStatus();
+                      if (!mounted) return;
+                      if (fresh != AppleAiStatus.available) {
+                        setState(() => _appleMsg = fresh.message);
+                        return;
+                      }
+                    }
+                    try {
+                      await cfg.save(useApple: on);
+                    } catch (_) {
+                      if (mounted) {
+                        setState(() => _appleMsg =
+                            AppLocalizations.of(context)
+                                    ?.logWorkoutCouldNotSave ??
+                                'Could not save that — try again.');
+                      }
+                      return;
+                    }
+                    if (mounted) {
+                      setState(() {
+                        _apple = on;
+                        _appleMsg = null;
+                        _msg = null;
+                        if (!on) {
+                          // Back to the saved route and model.
+                          _chatgpt = cfg.savedUsesChatGpt;
+                          _api = _chatgpt ? CoachApi.responses : cfg.api;
+                          _model = cfg.savedModel;
+                        }
+                      });
+                    }
+                  },
           ),
         ]),
         const SizedBox(height: S.x3),
         Text(
             st == null
-                ? tr(c, 'Checking Apple Intelligence…', 'جارٍ التحقق من Apple Intelligence…')
-                : st.text(isArabic(c)),
+                ? uiText(c, 'Checking Apple Intelligence…')
+                : uiText(c, st.message),
             style: F.cap.copyWith(color: ready ? p.on(C.green) : p.ink3)),
         if (_apple) ...[
           const SizedBox(height: S.x2),
           Text(
-              tr(c, 'The coach, briefings and journal now use Apple’s small on-device model. It answers from your last two weeks and can’t log things for you; switch it off to use a bigger model instead.', 'يستخدم المدرب والملخصات واليوميات الآن نموذج Apple الصغير على الجهاز. يجيب من بيانات آخر أسبوعين ولا يستطيع التسجيل نيابةً عنك؛ أوقفه لاستخدام نموذج أكبر.'),
+              uiText(c,
+                  'The coach, briefings and journal now use Apple’s small on-device model. It answers from your last two weeks and can’t log things for you; switch it off to use a bigger model instead.'),
               style: F.cap.copyWith(color: p.ink3)),
         ],
         if (_appleMsg != null) ...[
           const SizedBox(height: S.x2),
-          Text(_appleMsg!, style: F.cap.copyWith(color: p.on(C.red))),
+          Text(uiText(c, _appleMsg!), style: F.cap.copyWith(color: p.on(C.red))),
         ],
       ]),
     );
@@ -1475,8 +1525,11 @@ class _CoachSetupState extends State<CoachSetup> {
               child: ListView(
                 padding: pad,
                 children: [
-                  _appleCard(c, p),
-                  const SizedBox(height: S.x4),
+                  // Apple's on-device model exists only on iPhone (iOS 26+).
+                  if (defaultTargetPlatform == TargetPlatform.iOS) ...[
+                    _appleCard(c, p),
+                    const SizedBox(height: S.x4),
+                  ],
                   if (!_apple) Section(
                     l?.coachWhereModelRuns ?? 'Where the model runs',
                     Column(

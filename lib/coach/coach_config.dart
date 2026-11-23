@@ -193,12 +193,15 @@ class CoachConfig extends ChangeNotifier {
   /// the BYOK settings are kept untouched for switching back.
   final ChatGptAuth chatgpt;
   bool _useChatGpt = false;
-  bool get usesChatGpt => _useChatGpt && !_useApple;
+  bool get usesChatGpt => _useChatGpt && !usesApple;
 
   /// Apple's on-device model (Foundation Models, iOS 26+): no key, no network,
   /// nothing leaves the phone. Takes precedence over every other route.
   bool _useApple = false;
-  bool get usesApple => _useApple;
+  /// Apple's on-device model exists only on iPhone; a setting restored from
+  /// an iOS backup onto another platform must not route there.
+  bool get usesApple =>
+      _useApple && defaultTargetPlatform == TargetPlatform.iOS;
 
   String _baseUrl = defaultBaseUrl;
   CoachApi _api = CoachApi.defaultFor(defaultBaseUrl);
@@ -211,7 +214,12 @@ class CoachConfig extends ChangeNotifier {
   /// user can fix by pasting one — this one fixes itself on the next unlocked
   /// read, and telling them to set a key up again would be wrong.
   bool _keyUnreadable = false;
-  bool get keyUnreadable => _useChatGpt ? chatgpt.unreadable : _keyUnreadable;
+  /// Never while Apple's on-device model is in use: it needs no key, so a
+  /// saved provider's unreadable key must not hide its chat. The flags stay
+  /// as they are for when Apple is switched off.
+  bool get keyUnreadable => usesApple
+      ? false
+      : (_useChatGpt ? chatgpt.unreadable : _keyUnreadable);
 
   /// True while it is still unknown whether a key is stored — an install that
   /// predates the marker, read while the keychain was unavailable. Not shown to
@@ -267,7 +275,12 @@ class CoachConfig extends ChangeNotifier {
 
   String get baseUrl => _baseUrl;
   CoachApi get api => usesChatGpt ? CoachApi.responses : _api;
-  String get model => _useApple ? kAppleOnDeviceModel : _model;
+  String get model => usesApple ? kAppleOnDeviceModel : _model;
+
+  /// The saved bring-your-own route and model, untouched by the Apple switch:
+  /// what the setup screen restores when Apple is switched off.
+  bool get savedUsesChatGpt => _useChatGpt;
+  String get savedModel => _model;
   /// The saved, user-configurable timeout — meaningful only for a local
   /// endpoint (see [requestTimeout]), but kept intact and readable regardless
   /// of the endpoint currently configured so a UI can show/restore it as the
@@ -288,14 +301,14 @@ class CoachConfig extends ChangeNotifier {
   /// Save closed the form, `configured` stayed false, and the coach never came
   /// on with nothing on screen to explain why. See [isLocalCoachHost] for the
   /// host classification.
-  bool get isLocalEndpoint => _useApple || isLocalCoachHost(apiBase);
+  bool get isLocalEndpoint => usesApple || isLocalCoachHost(apiBase);
 
   /// Whether the endpoint is on this device or a private network — the gate
   /// for skipping a consent prompt before health data leaves the phone.
   /// Narrower than [isLocalEndpoint]; see [isPrivateCoachHost].
-  bool get isPrivateEndpoint => _useApple || isPrivateCoachHost(apiBase);
+  bool get isPrivateEndpoint => usesApple || isPrivateCoachHost(apiBase);
 
-  bool get configured => _useApple
+  bool get configured => usesApple
       ? true
       : _useChatGpt
       ? chatgpt.sharing && _model.isNotEmpty
@@ -305,11 +318,11 @@ class CoachConfig extends ChangeNotifier {
   /// only the ChatGPT sign-in counts: a BYOK key left over from before the
   /// switch is not used there, so a signed-out ChatGPT coach is not set up.
   bool get remindersConfigured =>
-      _useApple ? true : (_useChatGpt ? configured : hasKey);
+      usesApple ? true : (_useChatGpt ? configured : hasKey);
 
   /// Normalised base, no trailing slash.
   String get apiBase {
-    if (_useApple) return kAppleOnDeviceBase;
+    if (usesApple) return kAppleOnDeviceBase;
     if (_useChatGpt) return kChatGptApiBase;
     var b = _baseUrl.trim();
     while (b.endsWith('/')) {
@@ -346,6 +359,9 @@ class CoachConfig extends ChangeNotifier {
     // with the resume retry permanently disabled.
     _keyUnreadable = marker == true && !hasKey;
     _keyUndetermined = marker == null;
+    // Apple's on-device model needs no key, so its restored choice is
+    // complete here: published now, not after a keychain read that may hang.
+    if (usesApple) notifyListeners();
 
     try {
       final read = await _secure.read(
@@ -440,37 +456,8 @@ class CoachConfig extends ChangeNotifier {
     bool? useApple,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    if (useApple != null) {
-      _useApple = useApple;
-      await prefs.setBool(_kUseApple, useApple);
-    }
-    if (useChatGpt != null) {
-      _useChatGpt = useChatGpt;
-      await prefs.setBool(_kUseChatGpt, useChatGpt);
-    }
-    if (baseUrl != null) {
-      final previousOrigin = coachEndpointOrigin(_baseUrl);
-      _baseUrl = baseUrl.trim().isEmpty ? defaultBaseUrl : baseUrl.trim();
-      if (api == null && coachEndpointOrigin(_baseUrl) != previousOrigin) {
-        api = CoachApi.defaultFor(_baseUrl);
-      }
-      await prefs.setString(_kBaseUrl, _baseUrl);
-    }
-    if (api != null) {
-      _api = api;
-      await prefs.setString(_kApi, api.name);
-    }
-    if (model != null) {
-      _model = model.trim();
-      await prefs.setString(_kModel, _model);
-    }
-    // A non-positive value would fail every request instantly, so it is
-    // rejected in favour of whatever was already in effect rather than
-    // silently accepted.
-    if (timeoutSeconds != null && timeoutSeconds > 0) {
-      _timeoutSeconds = timeoutSeconds;
-      await prefs.setInt(_kTimeoutSeconds, _timeoutSeconds);
-    }
+    // The key goes first: if the keychain refuses it, nothing else is applied,
+    // so the old key never ends up bound to a new endpoint.
     if (apiKey != null) {
       _generation++;
       final k = apiKey.trim();
@@ -522,6 +509,41 @@ class CoachConfig extends ChangeNotifier {
       _key = k.isEmpty ? null : k;
       _keyUnreadable = false;
       _keyUndetermined = false;
+    }
+    if (useApple != null) {
+      // Stored first, and in memory only once that landed: a failed write
+      // must not leave this run on Apple while the saved choice says off.
+      if (!await prefs.setBool(_kUseApple, useApple)) {
+        throw StateError('Couldn’t save the AI provider choice.');
+      }
+      _useApple = useApple;
+    }
+    if (useChatGpt != null) {
+      _useChatGpt = useChatGpt;
+      await prefs.setBool(_kUseChatGpt, useChatGpt);
+    }
+    if (baseUrl != null) {
+      final previousOrigin = coachEndpointOrigin(_baseUrl);
+      _baseUrl = baseUrl.trim().isEmpty ? defaultBaseUrl : baseUrl.trim();
+      if (api == null && coachEndpointOrigin(_baseUrl) != previousOrigin) {
+        api = CoachApi.defaultFor(_baseUrl);
+      }
+      await prefs.setString(_kBaseUrl, _baseUrl);
+    }
+    if (api != null) {
+      _api = api;
+      await prefs.setString(_kApi, api.name);
+    }
+    if (model != null) {
+      _model = model.trim();
+      await prefs.setString(_kModel, _model);
+    }
+    // A non-positive value would fail every request instantly, so it is
+    // rejected in favour of whatever was already in effect rather than
+    // silently accepted.
+    if (timeoutSeconds != null && timeoutSeconds > 0) {
+      _timeoutSeconds = timeoutSeconds;
+      await prefs.setInt(_kTimeoutSeconds, _timeoutSeconds);
     }
     notifyListeners();
   }

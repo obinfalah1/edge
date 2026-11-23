@@ -658,11 +658,17 @@ class TimelineData {
   /// hrOverride: …)` without a second `getDayTimeline` call (M6 §7.3).
   final Map<String, dynamic>? raw;
 
+  // One decode of each day bundle per load, not one per getter (see
+  // LocalRepository.sharingDayReads).
   static Future<TimelineData> load(
     LocalRepository repo, {
     String? want,
     AppLocalizations? l,
-  }) async {
+  }) =>
+      repo.sharingDayReads(() => _read(repo, want, l));
+
+  static Future<TimelineData> _read(
+      LocalRepository repo, String? want, AppLocalizations? l) async {
     final days = await repo.availableDays();
     final today = await repo.getToday();
     final day = pickDay(
@@ -972,7 +978,7 @@ class _DayTimelineScreenState extends State<DayTimelineScreen> {
       ...dayNavRow(_day ?? d.day, d.days, _goDay),
       if (_loading) ...[
         const SizedBox(height: S.x8),
-        const Center(child: CircularProgressIndicator.adaptive()),
+        const Center(child: CircularProgressIndicator()),
       ] else if (_failed) ...[
         const SizedBox(height: S.x2),
         StatusCard(
@@ -1460,7 +1466,10 @@ class _MomentRowState extends State<MomentRow> {
           expanded: _open,
           onTap: _toggle,
           excludeSemantics: true,
-          child: Pressable(onTap: _toggle, child: row),
+          child: Pressable(
+            onTap: _toggle,
+            child: row,
+          ),
         ),
         if (_open)
           Padding(
