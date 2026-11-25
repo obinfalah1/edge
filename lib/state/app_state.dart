@@ -5549,6 +5549,7 @@ class AppState extends ChangeNotifier {
     int? offsetMinutes,
     int? buzzCount,
     int? pauseSteps,
+    bool? longBuzz,
   }) async {
     for (var d = _disableInFlight; d != null; d = _disableInFlight) {
       await d;
@@ -5560,6 +5561,7 @@ class AppState extends ChangeNotifier {
       offsetMinutes: offsetMinutes,
       buzzCount: buzzCount,
       pauseSteps: pauseSteps,
+      longBuzz: longBuzz,
     );
     await next.save(prefs);
     if (next.enabled &&
@@ -5651,18 +5653,24 @@ class AppState extends ChangeNotifier {
   /// Arm the band's alarm one minute from now with the Fajr buzz pattern, so
   /// the user can feel the exact rhythm the band will use at Fajr. The real
   /// next alarm is written back once the test has fired (the strap's fired
-  /// event re-arms) and, as a backstop, once it has finished buzzing. Returns true when the
-  /// band refused the custom pattern and the stock one was used instead.
-  Future<bool> testFajrAlarm() async {
+  /// event re-arms) and, as a backstop, once it has finished buzzing. Returns
+  /// which pattern the band took: 0 the one asked for, 1 the user's own
+  /// buzzes because it refused the long buzz, 2 its stock alarm buzz.
+  Future<int> testFajrAlarm() async {
     if (!isConnected) throw Exception('Connect to your strap first');
     final at = DateTime.now().add(const Duration(minutes: 1));
-    final haptics = fajrHapticPattern(
+    final own = fajrHapticPattern(
         buzzCount: _fajr.buzzCount, pauseSteps: _fajr.pauseSteps);
-    var r = await engine.armAlarm(at, haptics: haptics);
-    var usedStock = false;
+    var r = await engine.armAlarm(at,
+        haptics: _fajr.longBuzz ? fajrLongPattern() : own);
+    var usedStock = 0;
+    if (r.armed == null && _fajr.longBuzz) {
+      r = await engine.armAlarm(at, haptics: own);
+      usedStock = 1;
+    }
     if (r.armed == null) {
       r = await engine.armAlarm(at);
-      usedStock = true;
+      usedStock = 2;
     }
     if (r.armed == null) {
       throw Exception('The band did not take the test alarm — try again');
@@ -5670,6 +5678,11 @@ class AppState extends ChangeNotifier {
     // The strap's slot now holds the test, not the persisted arm: forget the
     // persisted one so every later re-arm writes the real next alarm again.
     await _clearArmedAlarmState();
+    // Keep every automatic re-arm off the slot until the test has buzzed:
+    // leaving the app right after the tap starts a new session, whose arm
+    // would write tomorrow's alarm over the test.
+    await holdForFajrTest(
+        await SharedPreferences.getInstance(), at.add(kAlarmRingHold));
     notifyListeners();
     // Not before the test has fired (60 s) and finished buzzing
     // ([kAlarmRingHold]): an earlier write would cut a long pattern short.
@@ -5830,6 +5843,13 @@ class AppState extends ChangeNotifier {
       _log('[alarm] re-arm held: the band may still be buzzing.');
       return true;
     }
+    if (!force && firedEpoch == null) {
+      final p = await SharedPreferences.getInstance();
+      if (fajrTestPending(p, DateTime.now())) {
+        _log('[alarm] re-arm held: a Fajr test buzz is armed.');
+        return true;
+      }
+    }
     try {
       // A headless re-arm (background_sync.dart) can have rewritten
       // `alarm_epoch`/`alarm_epoch_confirmed` under this same live process
@@ -5862,6 +5882,16 @@ class AppState extends ChangeNotifier {
       // if permission was already given — never a prompt from a connect).
       await refreshFajrTimesIfNeeded(prefs, useGps: true);
       await refreshPrayerTimesIfNeeded(prefs, useGps: true);
+      if (firedEpoch != null) {
+        // The Fajr buzz repeats until the wearer stops one (double tap).
+        final why = engine.lastHapticsTermination;
+        final whyTs = engine.lastHapticsTerminationTs ?? 0;
+        await noteFajrAlarmFired(prefs,
+            firedEpoch: firedEpoch,
+            dismissed:
+                why != null && why != 'expired' && whyTs >= firedEpoch - 5,
+            now: DateTime.now());
+      }
       final from = alarmRearmFrom(DateTime.now(), firedEpoch);
       final fajr = loadFajrPlan(prefs, from);
       _readFajrState(prefs);
@@ -5871,6 +5901,7 @@ class AppState extends ChangeNotifier {
         currentArmedEpoch: force ? null : (_savedAlarm ?? device.alarmEpoch),
         now: from,
         fajr: fajr,
+        fajrFallback: fajrFallbackHaptics(prefs),
         timer: loadBandTimerPlan(prefs, from),
       );
       if (result.disabled) {

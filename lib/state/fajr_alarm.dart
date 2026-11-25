@@ -37,6 +37,9 @@ const String _kEnabled = 'fajr_alarm_enabled';
 const String _kOffset = 'fajr_alarm_offset_min';
 const String _kCount = 'fajr_alarm_buzz_count';
 const String _kGap = 'fajr_alarm_pause_steps';
+const String _kLong = 'fajr_alarm_long_buzz';
+const String _kRepeatAt = 'fajr_alarm_repeat_at';
+const String _kRepeatN = 'fajr_alarm_repeat_n';
 const String _kCache = 'fajr_alarm_cache_v1';
 const String _kCoords = 'fajr_alarm_coords_v1';
 const String _kFetchedAt = 'fajr_alarm_fetched_at_ms';
@@ -49,7 +52,7 @@ class FajrAlarmSettings {
   /// Minutes after Fajr the band buzzes (0..120).
   final int offsetMinutes;
 
-  /// How many buzzes (1..20).
+  /// How many buzzes (1..7; the band refuses a longer loop).
   final int buzzCount;
 
   /// Pause between buzzes, in steps of the strap's stock 240 ms pause
@@ -59,15 +62,21 @@ class FajrAlarmSettings {
   /// from repeats of the one pause value the stock alarm already uses.
   final int pauseSteps;
 
+  /// Arm the long pattern ([fajrLongPattern], about 25 s of buzzing) instead
+  /// of [buzzCount] single buzzes. Those stay the fallback when the band
+  /// refuses the long one.
+  final bool longBuzz;
+
   const FajrAlarmSettings({
     this.enabled = false,
     this.offsetMinutes = 15,
     this.buzzCount = 3,
     this.pauseSteps = 7,
+    this.longBuzz = true,
   });
 
   static const int maxOffset = 120;
-  static const int maxCount = 20;
+  static const int maxCount = 7;
   static const int maxPause = 7;
 
   /// One pause step, as the strap plays it.
@@ -78,12 +87,14 @@ class FajrAlarmSettings {
     int? offsetMinutes,
     int? buzzCount,
     int? pauseSteps,
+    bool? longBuzz,
   }) =>
       FajrAlarmSettings(
         enabled: enabled ?? this.enabled,
         offsetMinutes: (offsetMinutes ?? this.offsetMinutes).clamp(0, maxOffset),
         buzzCount: (buzzCount ?? this.buzzCount).clamp(1, maxCount),
         pauseSteps: (pauseSteps ?? this.pauseSteps).clamp(1, maxPause),
+        longBuzz: longBuzz ?? this.longBuzz,
       );
 
   static FajrAlarmSettings load(SharedPreferences prefs) =>
@@ -92,6 +103,7 @@ class FajrAlarmSettings {
         offsetMinutes: prefs.getInt(_kOffset),
         buzzCount: prefs.getInt(_kCount),
         pauseSteps: prefs.getInt(_kGap),
+        longBuzz: prefs.getBool(_kLong),
       );
 
   Future<void> save(SharedPreferences prefs) async {
@@ -99,6 +111,7 @@ class FajrAlarmSettings {
     await prefs.setInt(_kOffset, offsetMinutes);
     await prefs.setInt(_kCount, buzzCount);
     await prefs.setInt(_kGap, pauseSteps);
+    await prefs.setBool(_kLong, longBuzz);
   }
 
   @override
@@ -107,15 +120,17 @@ class FajrAlarmSettings {
       other.enabled == enabled &&
       other.offsetMinutes == offsetMinutes &&
       other.buzzCount == buzzCount &&
-      other.pauseSteps == pauseSteps;
+      other.pauseSteps == pauseSteps &&
+      other.longBuzz == longBuzz;
 
   @override
   int get hashCode =>
-      Object.hash(enabled, offsetMinutes, buzzCount, pauseSteps);
+      Object.hash(enabled, offsetMinutes, buzzCount, pauseSteps, longBuzz);
 
   @override
   String toString() => 'FajrAlarmSettings(enabled: $enabled, '
-      'offset: ${offsetMinutes}m, buzzes: $buzzCount, pause steps: $pauseSteps)';
+      'offset: ${offsetMinutes}m, buzzes: $buzzCount, pause steps: $pauseSteps, '
+      'long: $longBuzz)';
 }
 
 /// The strap's 12-byte alarm haptic pattern for [buzzCount] buzzes with
@@ -143,6 +158,67 @@ List<int> fajrHapticPattern({required int buzzCount, required int pauseSteps}) {
       (count * (500 + pauses * FajrAlarmSettings.pauseStepMs) / 1000).ceil() + 5;
   final duration = needed < 30 ? 30 : (needed > 255 ? 255 : needed);
   return <int>[...slots, 0, 0, count, duration];
+}
+
+/// The long Fajr pattern: three buzzes back to back, one 240 ms pause, twice
+/// per loop, looped 7 times — 42 buzzes, about 25 s, where the stock alarm is
+/// over in about 5 s (slept through on 2026-11-25 although the band logged
+/// that it fired). Only the two waveform values and the loop count the band
+/// is known to accept; 38 s is an alarm length it has accepted. Whether it
+/// takes several buzzes in one loop is not known: a refusal falls back to the
+/// user's own buzzes ([fajrFallbackHaptics]), then to the stock pattern.
+List<int> fajrLongPattern() =>
+    const <int>[47, 47, 47, 152, 47, 47, 47, 152, 0, 0, 7, 38];
+
+/// What to arm when the band refuses the plan's pattern, before the stock
+/// one: the user's own buzzes while the long buzz is on, else nothing.
+List<int>? fajrFallbackHaptics(SharedPreferences prefs) {
+  final s = FajrAlarmSettings.load(prefs);
+  if (!s.longBuzz) return null;
+  return fajrHapticPattern(buzzCount: s.buzzCount, pauseSteps: s.pauseSteps);
+}
+
+/// How many times the Fajr buzz repeats when nobody stops it, and how long
+/// after the alarm each repeat comes.
+const int kFajrRepeats = 2;
+const int kFajrRepeatGapSec = 120;
+
+/// Called when the band's alarm armed for [firedEpoch] has fired and finished
+/// buzzing. If that was the Fajr alarm (or one of its repeats) and the wearer
+/// did not stop it ([dismissed]), schedule a repeat for [loadFajrPlan] to
+/// return; otherwise clear any repeat. A repeat needs the phone to reach the
+/// band after the alarm, so it is a best effort on top of the alarm itself.
+Future<void> noteFajrAlarmFired(
+  SharedPreferences prefs, {
+  required int firedEpoch,
+  required bool dismissed,
+  required DateTime now,
+}) async {
+  final s = FajrAlarmSettings.load(prefs);
+  final storedAt = prefs.getInt(_kRepeatAt);
+  final isRepeat = storedAt != null && (firedEpoch - storedAt).abs() <= 60;
+  var isFajr = false;
+  if (!isRepeat) {
+    for (final sec in FajrTimes.readCache(prefs).values) {
+      if ((sec + s.offsetMinutes * 60 - firedEpoch).abs() <= 60) isFajr = true;
+    }
+  }
+  final done = isRepeat ? (prefs.getInt(_kRepeatN) ?? 0) : 0;
+  final nowSec = now.millisecondsSinceEpoch ~/ 1000;
+  final late = nowSec - firedEpoch > 20 * 60;
+  if (!s.enabled ||
+      !(isRepeat || isFajr) ||
+      dismissed ||
+      done >= kFajrRepeats ||
+      late) {
+    await prefs.remove(_kRepeatAt);
+    await prefs.remove(_kRepeatN);
+    return;
+  }
+  final earliest = nowSec + 45;
+  final wanted = firedEpoch + kFajrRepeatGapSec;
+  await prefs.setInt(_kRepeatAt, wanted > earliest ? wanted : earliest);
+  await prefs.setInt(_kRepeatN, done + 1);
 }
 
 /// Today's and the coming weeks' Fajr instants, keyed by local date
@@ -331,10 +407,35 @@ typedef FajrPlan = ({DateTime? next, List<int> haptics});
 /// Read settings + cache and compute the plan. No network.
 FajrPlan loadFajrPlan(SharedPreferences prefs, DateTime now) {
   final s = FajrAlarmSettings.load(prefs);
+  var next = nextFajrAlarm(FajrTimes.readCache(prefs), s, now);
+  // A pending repeat of this morning's buzz comes before tomorrow's Fajr.
+  final repeat = prefs.getInt(_kRepeatAt);
+  if (s.enabled && repeat != null) {
+    final at = DateTime.fromMillisecondsSinceEpoch(repeat * 1000);
+    if (at.isAfter(now) && (next == null || at.isBefore(next))) next = at;
+  }
   return (
-    next: nextFajrAlarm(FajrTimes.readCache(prefs), s, now),
-    haptics: fajrHapticPattern(buzzCount: s.buzzCount, pauseSteps: s.pauseSteps),
+    next: next,
+    haptics: s.longBuzz
+        ? fajrLongPattern()
+        : fajrHapticPattern(buzzCount: s.buzzCount, pauseSteps: s.pauseSteps),
   );
+}
+
+/// Until when (unix ms) the band's alarm slot holds a "Test the Fajr buzz"
+/// alarm. Every automatic re-arm (a sync, a reconnect, the app going to the
+/// background, the headless path) must leave the slot alone until then:
+/// writing the real next alarm over it cancels the test before it buzzes.
+const String kFajrTestHoldKey = 'fajr_test_until_ms';
+
+/// Start the hold: nothing automatic writes the slot before [until].
+Future<void> holdForFajrTest(SharedPreferences prefs, DateTime until) =>
+    prefs.setInt(kFajrTestHoldKey, until.millisecondsSinceEpoch);
+
+/// True while a test buzz is armed and has not finished.
+bool fajrTestPending(SharedPreferences prefs, DateTime now) {
+  final until = prefs.getInt(kFajrTestHoldKey);
+  return until != null && now.millisecondsSinceEpoch < until;
 }
 
 /// Refresh the cache when it is stale, within [timeout]. Never throws.

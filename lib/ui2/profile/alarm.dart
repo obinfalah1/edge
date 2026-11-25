@@ -220,6 +220,8 @@ class AlarmScreen extends StatelessWidget {
         "Saved, but the band hasn't taken it yet — it's sent again on the next sync");
     // The Fajr alarm is a personal addition: its copy is English only.
     const noTimes = "Couldn't get prayer times — check the internet connection";
+    const ownPattern =
+        'The band refused the long buzz — the test (and Fajr) use your Buzzes and Gap instead';
     const stockPattern =
         'The band refused the custom pattern — the test (and Fajr) use its standard alarm buzz';
     Future<void> onBand(Future<bool> write) async {
@@ -245,19 +247,22 @@ class AlarmScreen extends StatelessWidget {
       fajrNext: app.fajrAlarmNext,
       fajrPrayer: app.fajrPrayerNext,
       fajrSource: app.fajrLocationSource,
-      onSetFajr: ({enabled, offsetMinutes, buzzCount, pauseSteps}) async {
+      onSetFajr: ({enabled, offsetMinutes, buzzCount, pauseSteps, longBuzz}) async {
         final onBandNow = await app.setFajrAlarm(
             enabled: enabled,
             offsetMinutes: offsetMinutes,
             buzzCount: buzzCount,
-            pauseSteps: pauseSteps);
+            pauseSteps: pauseSteps,
+            longBuzz: longBuzz);
         if (!onBandNow) throw Exception(notOnBand);
       },
       onRefreshFajr: () async {
         if (!await app.refreshFajrTimes()) throw Exception(noTimes);
       },
       onTestFajr: () async {
-        if (await app.testFajrAlarm()) throw Exception(stockPattern);
+        final used = await app.testFajrAlarm();
+        if (used == 1) throw Exception(ownPattern);
+        if (used == 2) throw Exception(stockPattern);
       },
       prayerToday: app.prayerTimesToday,
       onSetPrayer: ({toggle, offsetMinutes, buzzCount}) async {
@@ -317,6 +322,7 @@ class AlarmScreenView extends StatelessWidget {
     int? offsetMinutes,
     int? buzzCount,
     int? pauseSteps,
+    bool? longBuzz,
   })? onSetFajr;
   final Future<void> Function()? onRefreshFajr, onTestFajr;
 
@@ -745,9 +751,10 @@ class AlarmScreenView extends StatelessWidget {
   }
 
   Widget _fajrRows(BuildContext c, FajrAlarmSettings f, {required bool showNext}) {
-    Future<void> set({bool? on, int? off, int? n, int? gap}) async {
+    Future<void> set({bool? on, int? off, int? n, int? gap, bool? long}) async {
       if (onSetFajr == null) return;
-      await onSetFajr!(enabled: on, offsetMinutes: off, buzzCount: n, pauseSteps: gap);
+      await onSetFajr!(
+          enabled: on, offsetMinutes: off, buzzCount: n, pauseSteps: gap, longBuzz: long);
     }
     void toggle() {
       selectHaptic();
@@ -777,10 +784,24 @@ class AlarmScreenView extends StatelessWidget {
             onTap: () => _pickNumber(c, _fajrText('Minutes after Fajr'),
                 const [0, 5, 10, 15, 20, 25, 30, 45, 60, 90, 120], (m) => '$m min', (m) => set(off: m))),
         ListRow(
+          title: _fajrText('Long buzz'),
+          sub: f.longBuzz
+              ? _fajrText('About 25 s, repeated after 2 and 4 min until you double-tap the band')
+              : _fajrText('Off: only the buzzes below'),
+          trailing: Switch.adaptive(
+              value: f.longBuzz,
+              onChanged: onSetFajr == null
+                  ? null
+                  : (v) => _run(c, () => set(long: v),
+                      v ? _fajrText('Long buzz on') : _fajrText('Long buzz off'))),
+          chevron: false,
+        ),
+        ListRow(
             title: _fajrText('Buzzes'),
+            sub: f.longBuzz ? _fajrText('Used if the band refuses the long buzz') : null,
             detail: '${f.buzzCount}',
             onTap: () => _pickNumber(c, _fajrText('Buzzes'),
-                [for (var i = 1; i <= 10; i++) i, 15, 20], (n) => '$n', (n) => set(n: n))),
+                [for (var i = 1; i <= FajrAlarmSettings.maxCount; i++) i], (n) => '$n', (n) => set(n: n))),
         ListRow(
             title: 'Gap between buzzes',
             detail: '${(f.pauseSteps * FajrAlarmSettings.pauseStepMs / 1000).toStringAsFixed(1)} s',

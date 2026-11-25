@@ -110,6 +110,21 @@ void main() {
   });
 
   group('settings', () {
+    test('a pending test buzz holds automatic re-arms until it has rung',
+        () async {
+      SharedPreferences.setMockInitialValues({});
+      final prefs = await SharedPreferences.getInstance();
+      final now = DateTime(2026, 11, 25, 10, 49, 21);
+      expect(fajrTestPending(prefs, now), isFalse);
+      await holdForFajrTest(
+          prefs, now.add(const Duration(minutes: 1) + kAlarmRingHold));
+      // 36 s later the app went to the background and re-armed (the bug).
+      expect(fajrTestPending(prefs, now.add(const Duration(seconds: 36))),
+          isTrue);
+      expect(fajrTestPending(prefs, now.add(const Duration(minutes: 3))),
+          isFalse);
+    });
+
     test('defaults: 15 min after Fajr, 3 buzzes, longest pause', () {
       const s = FajrAlarmSettings();
       expect([s.enabled, s.offsetMinutes, s.buzzCount, s.pauseSteps],
@@ -247,6 +262,26 @@ void main() {
       expect(sets[1].sublist(8, 20), AlarmPayloads.defaultHaptics);
     }, timeout: const Timeout(Duration(seconds: 60)));
 
+    test('a refused long buzz falls back to the own buzzes, then the stock',
+        () async {
+      final e = engine();
+      final sets = _installGen5(e, accept: false);
+      final long = (next: plan.next, haptics: fajrLongPattern());
+      final own = fajrHapticPattern(buzzCount: 7, pauseSteps: 7);
+      await armNextScheduledOccurrence(
+        engine: e,
+        schedule: weekly(enabled: false),
+        currentArmedEpoch: null,
+        now: now,
+        fajr: long,
+        fajrFallback: own,
+      );
+      expect(sets, hasLength(3));
+      expect(sets[0].sublist(8, 20), fajrLongPattern());
+      expect(sets[1].sublist(8, 20), own);
+      expect(sets[2].sublist(8, 20), AlarmPayloads.defaultHaptics);
+    }, timeout: const Timeout(Duration(seconds: 90)));
+
     test('an unchanged arm is not rewritten', () async {
       final e = engine();
       final sets = _installGen5(e);
@@ -259,6 +294,75 @@ void main() {
       );
       expect(r.epoch, isNull);
       expect(sets, isEmpty);
+    });
+  });
+
+  group('long buzz and repeats', () {
+    test('the long pattern uses only accepted values, 42 buzzes, 7 loops', () {
+      final p = fajrLongPattern();
+      expect(p, hasLength(12));
+      expect(p.sublist(0, 8).every((v) => v == 47 || v == 152), isTrue);
+      expect(p.sublist(0, 8).where((v) => v == 47).length * p[10], 42);
+      expect(p[10], 7);
+    });
+
+    test('an ignored Fajr buzz repeats twice, then stops', () async {
+      final fajr = DateTime(2026, 11, 25, 5, 21);
+      final fired = fajr.add(const Duration(minutes: 15));
+      final firedSec = fired.millisecondsSinceEpoch ~/ 1000;
+      SharedPreferences.setMockInitialValues({
+        'fajr_alarm_enabled': true,
+        'fajr_alarm_cache_v1':
+            '{"2026-11-25": ${fajr.millisecondsSinceEpoch ~/ 1000}}',
+      });
+      final prefs = await SharedPreferences.getInstance();
+      expect(FajrAlarmSettings.load(prefs).longBuzz, isTrue);
+      expect(loadFajrPlan(prefs, fired).haptics, fajrLongPattern());
+
+      // 1st repeat: 2 minutes after the alarm.
+      var now = fired.add(const Duration(seconds: 60));
+      await noteFajrAlarmFired(prefs,
+          firedEpoch: firedSec, dismissed: false, now: now);
+      final r1 = loadFajrPlan(prefs, now).next!;
+      expect(r1, fired.add(const Duration(minutes: 2)));
+
+      // The phone only woke 3 minutes after the 1st repeat: 45 s from then.
+      now = r1.add(const Duration(minutes: 3));
+      await noteFajrAlarmFired(prefs,
+          firedEpoch: r1.millisecondsSinceEpoch ~/ 1000,
+          dismissed: false,
+          now: now);
+      final r2 = loadFajrPlan(prefs, now).next!;
+      expect(r2, now.add(const Duration(seconds: 45)));
+
+      // After the 2nd repeat there is no third.
+      now = r2.add(const Duration(seconds: 60));
+      await noteFajrAlarmFired(prefs,
+          firedEpoch: r2.millisecondsSinceEpoch ~/ 1000,
+          dismissed: false,
+          now: now);
+      expect(loadFajrPlan(prefs, now).next, isNull);
+    });
+
+    test('a double tap, a test buzz or the switch off cancels repeats',
+        () async {
+      final fajr = DateTime(2026, 11, 25, 5, 21);
+      final fired = fajr.add(const Duration(minutes: 15));
+      final firedSec = fired.millisecondsSinceEpoch ~/ 1000;
+      final now = fired.add(const Duration(seconds: 60));
+      SharedPreferences.setMockInitialValues({
+        'fajr_alarm_enabled': true,
+        'fajr_alarm_cache_v1':
+            '{"2026-11-25": ${fajr.millisecondsSinceEpoch ~/ 1000}}',
+      });
+      final prefs = await SharedPreferences.getInstance();
+      await noteFajrAlarmFired(prefs,
+          firedEpoch: firedSec, dismissed: true, now: now);
+      expect(loadFajrPlan(prefs, now).next, isNull);
+      // Some other alarm (a test, the weekly one) is not the Fajr buzz.
+      await noteFajrAlarmFired(prefs,
+          firedEpoch: firedSec + 3600, dismissed: false, now: now);
+      expect(loadFajrPlan(prefs, now).next, isNull);
     });
   });
 

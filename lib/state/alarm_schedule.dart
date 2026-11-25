@@ -351,6 +351,7 @@ Future<AlarmArmResult> armNextScheduledOccurrence({
   required int? currentArmedEpoch,
   DateTime? now,
   FajrPlan? fajr,
+  List<int>? fajrFallback,
   BandTimerPlan? timer,
   PrayerBuzzPlan? prayers,
 }) async {
@@ -393,6 +394,13 @@ Future<AlarmArmResult> armNextScheduledOccurrence({
   var r = custom != null
       ? await engine.armAlarm(next, haptics: custom)
       : await engine.armAlarm(next);
+  if (r.armed == null &&
+      custom != null &&
+      identical(custom, fajr?.haptics) &&
+      fajrFallback != null) {
+    // The band refused the long Fajr pattern — try the user's own buzzes.
+    r = await engine.armAlarm(next, haptics: fajrFallback);
+  }
   if (custom != null && r.armed == null) {
     // The band refused (or never got) the custom pattern — arm the stock one.
     r = await engine.armAlarm(next);

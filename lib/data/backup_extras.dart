@@ -54,6 +54,9 @@ const Map<String, String> kPrefsNotBackedUp = {
   'fajr_alarm_fetched_at_ms': 'when this phone last fetched prayer times',
   'fajr_alarm_coords_v1': 'the location this phone fetched prayer times for',
   'fajr_alarm_coords_source': 'how this phone found that location',
+  'fajr_alarm_repeat_at': 'a pending repeat of this morning’s Fajr buzz; over within minutes',
+  'fajr_alarm_repeat_n': 'how many repeats this morning’s Fajr buzz has had',
+  'fajr_test_until_ms': 'a test buzz in progress; over within two minutes',
   'band_timer_epoch': 'a running band timer; over within the day',
   'prayer_buzz_cache_v1': 'prayer times cached for this phone’s location; fetched again',
   'prayer_buzz_fetched_at_ms': 'when this phone last fetched prayer times',
@@ -106,6 +109,7 @@ class ImportSummary extends MapView<String, int> {
 const Map<String, String> kPrefTypes = {
   'fajr_alarm_buzz_count': 'int',
   'fajr_alarm_enabled': 'bool',
+  'fajr_alarm_long_buzz': 'bool',
   'fajr_alarm_pause_steps': 'int',
   'fajr_alarm_offset_min': 'int',
   'prayer_buzz_on_dhuhr': 'bool',

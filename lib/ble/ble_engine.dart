@@ -2253,6 +2253,11 @@ class BleEngine {
   String? _lastHapticsTermination;
   int? _lastHapticsTerminationTs;
 
+  /// Why the band's last buzz ended (`expired` = it ran its course, anything
+  /// else = someone stopped it) and when (strap unix seconds).
+  String? get lastHapticsTermination => _lastHapticsTermination;
+  int? get lastHapticsTerminationTs => _lastHapticsTerminationTs;
+
   // ── reconnect/offload policy ────────────────────────────────────────────────
   // Marginal-radio + post-bond-loop persist ACROSS reconnects (they count
   // consecutive bad cycles), so they live for the engine's lifetime and self-reset

@@ -23,7 +23,7 @@ const _mustTravel = {
   'activity.nap_auto_log_since_sec',
   // Fajr alarm: the user's on/off and numbers travel; the times are refetched.
   'fajr_alarm_enabled', 'fajr_alarm_offset_min', 'fajr_alarm_buzz_count',
-  'fajr_alarm_pause_steps',
+  'fajr_alarm_pause_steps', 'fajr_alarm_long_buzz',
   'prayer_buzz_on_dhuhr', 'prayer_buzz_on_asr', 'prayer_buzz_on_maghrib',
   'prayer_buzz_on_isha', 'prayer_buzz_offset_min', 'prayer_buzz_count',
   'coach_api', 'coach_model', 'coach_timeout_seconds',
@@ -81,7 +81,8 @@ const _mustStay = {
   'alarm_pending_until', 'alarm_latch_alert', 'alarm_probe_pending', 'alarm_fired_at',
   'smart_wake_fired_epoch',
   'fajr_alarm_cache_v1', 'fajr_alarm_fetched_at_ms', 'fajr_alarm_coords_v1',
-  'fajr_alarm_coords_source', 'band_timer_epoch',
+  'fajr_alarm_coords_source', 'fajr_alarm_repeat_at', 'fajr_alarm_repeat_n',
+  'fajr_test_until_ms', 'band_timer_epoch',
   'band_timer_buzz_count', 'prayer_buzz_cache_v1', 'prayer_buzz_fetched_at_ms',
   'live.session_draft', 'live_session_checkpoint', 'telemetry_outbox',
   // Permission and grant are per install.

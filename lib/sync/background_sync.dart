@@ -297,6 +297,13 @@ Future<void> rearmHeadlessAlarm(BleEngine engine, PairedDevice paired) async {
         AlarmScheduleEntry.fromRow(r),
     ]);
     final prefs = await SharedPreferences.getInstance();
+    // This isolate caches preferences: read what the app last saved, or a
+    // changed buzz count or pause would be armed with its old value.
+    await prefs.reload();
+    if (fajrTestPending(prefs, DateTime.now())) {
+      debugPrint('[bgsync] alarm re-arm held: a Fajr test buzz is armed.');
+      return;
+    }
     final remoteId = paired.remoteId;
     // The armed alarm's time just passed: the band may still be buzzing, and
     // a write now would cut the pattern off (see [kAlarmRingHold]). Leave it;
@@ -319,6 +326,7 @@ Future<void> rearmHeadlessAlarm(BleEngine engine, PairedDevice paired) async {
         schedule: schedule,
         currentArmedEpoch: persistedAlarmEpoch(prefs, remoteId),
         fajr: fajr,
+        fajrFallback: fajrFallbackHaptics(prefs),
         timer: loadBandTimerPlan(prefs, DateTime.now()),
       ),
       LocalDb.alarmSetConfirmedSince,
